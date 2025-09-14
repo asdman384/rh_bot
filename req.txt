@@ -3,4 +3,3 @@ pywin32
 numpy
 Pillow
 opencv-python
-jupyter
