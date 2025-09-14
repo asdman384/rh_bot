@@ -1,0 +1,7 @@
+/images
+/images/*
+/minimap
+/__pycache__
+/__pycache__/*
+**/__pycache__/*
+/fails/*
