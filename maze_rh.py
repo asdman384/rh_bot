@@ -3,11 +3,12 @@ import time
 import cv2
 import numpy as np
 
-from boss import Boss, BossDain, BossElvira, BossKhanel
+from boss import Boss, BossDain, BossElvira, BossKhanel, BossMine
 from bot_utils.drafts import print_pixels_array
 from controller import Controller
 from count_enemies import count_enemies
 from db import (
+    RECT,
     NE_square,
     NW_square,
     SE_square,
@@ -46,6 +47,14 @@ def extract_center(frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
     Y = 345 - 80
     W = 300
     H = 200
+    return cv2.resize(frame[Y : Y + H, X : X + W], (W, H))
+
+
+def extract_minimap(frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
+    X = 0
+    Y = 100
+    W = 350
+    H = 300
     return cv2.resize(frame[Y : Y + H, X : X + W], (W, H))
 
 
@@ -139,6 +148,10 @@ def fa_get_open_dirs(
     }
 
 
+def minimap_open_dirs(hsv: cv2.typing.MatLike):
+    pass
+
+
 class MazeRH:
     _is_exit: tuple[bool, Direction | None] = (False, None)
     _enemies = 0
@@ -223,18 +236,20 @@ class MazeRH:
         del newFrame
         return diff
 
-    def _clear_enemies(self) -> bool:
+    def _clear_enemies(self, use_slide=True) -> bool:
         slided = False
-        if (self.moves - self.last_combat > 3) and self.boss.use_slide:
+        if (self.moves - self.last_combat > 3) and self.boss.use_slide and use_slide:
             time.sleep(0.2)
             self.controller.skill_3()  # slide
             slided = True
+            self.last_combat = self.moves
 
-        while self._enemies > 0:
+        attacks_count = 0
+        while self._enemies > 0 and attacks_count < 50:
             self.controller.attack()
             self._enemies = self._count_enemies()
+            attacks_count += 1
         time.sleep(1)
-        self.last_combat = self.moves
 
         return slided
 
@@ -256,7 +271,7 @@ class MazeRH:
             self.controller._tap(self.controller.skill_1_point)
             time.sleep(0.1)
 
-        frame = self.controller.device.get_frame2()
+        frame = self.get_frame()
 
         if self.fa_sense:
             self.controller._tap(self.controller.skill_1_point_cancel)
@@ -278,6 +293,15 @@ class MazeRH:
         decoded = self._get_frame_fa()
         frame830x690 = extract_game(decoded)
 
+        frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
+        # detect exit
+        self._is_exit = self.boss.is_near_exit(frame830x690hsv)
+        # detect enemies
+        self._enemies = self._count_enemies(frame830x690hsv)
+        if self._enemies > 0:
+            self._clear_enemies(False)
+            time.sleep(1)
+
         # detect possible directions
         self._direction_dict = self._open_dirs(
             frame830x690 if self.fa_sense else decoded
@@ -293,13 +317,6 @@ class MazeRH:
                 frame830x690 if self.fa_sense else decoded
             )
 
-        frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
-        # detect exit
-        self._is_exit = self.boss.is_near_exit(frame830x690hsv)
-        # detect enemies
-        self._enemies = self._count_enemies(frame830x690hsv)
-
-        # cv2.waitKey(0)
         return decoded
 
 
@@ -308,13 +325,109 @@ if __name__ == "__main__":
     device.connect()
     controller = Controller(device)
     # boss = BossKhanel(controller, False)
-    boss = BossElvira(controller, True)
+    boss = BossMine(controller, True)
     maze = MazeRH(controller, boss, True)
 
-    while 1:
-        # res, _ = boss.is_near_exit(
-        #     cv2.cvtColor(extract_game(maze.get_frame()), cv2.COLOR_BGR2HSV)
-        # )
-        # print(res)
+    def find_largest_contour_centroid(mask):
+        cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not cnts:
+            return None
+        c = max(cnts, key=cv2.contourArea)
+        M = cv2.moments(c)
+        if M["m00"] == 0:
+            return None
+        cx = int(M["m10"] / M["m00"])
+        cy = int(M["m01"] / M["m00"])
+        return (cx, cy)
 
-        maze.sense()
+    def player_mask(hsv: cv2.typing.MatLike) -> cv2.typing.MatLike:
+        pm1 = cv2.inRange(hsv, (0, 66, 116), (7, 109, 170))
+        pm2 = cv2.inRange(hsv, (151, 21, 114), (180, 127, 206))
+        pm = cv2.bitwise_or(pm1, pm2)
+
+        # Чистим от шумов
+        kernel = np.ones((5, 5), np.uint8)
+        pm = cv2.morphologyEx(pm, cv2.MORPH_OPEN, kernel, iterations=1)
+        # pm = cv2.morphologyEx(pm, cv2.MORPH_CLOSE, kernel, iterations=1)
+        return pm
+
+    def check_rect(frame, p_xy, prev_p_xy, offset) -> float:
+        white_count = 0
+        for x, y in RECT:
+            if prev_p_xy is not None:
+                p_xy = (
+                    prev_p_xy[0] if abs(prev_p_xy[0] - p_xy[0]) > 10 else p_xy[0],
+                    prev_p_xy[1] if abs(prev_p_xy[1] - p_xy[1]) > 10 else p_xy[1],
+                )
+
+            rect_x = x + p_xy[0] + offset[0]
+            rect_y = y + p_xy[1] + offset[1]
+
+            if rect_y >= 300 or rect_x >= 350:
+                continue
+
+            # frame[rect_y, rect_x] = 0
+
+            if frame[rect_y, rect_x] == 255:
+                white_count += 1
+
+        return white_count / len(RECT) * 100
+
+    frame = cv2.imread("frame.png", cv2.IMREAD_COLOR)
+
+    ## new sense
+    prev_p_xy = None
+    while 1:
+        frame = extract_minimap(maze.get_frame())
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        pm = player_mask(hsv)
+        cv2.imshow("minimap/pm", pm)
+
+        p_xy = find_largest_contour_centroid(pm)
+
+        path_m = cv2.inRange(hsv, (97, 109, 88), (123, 193, 125))
+        wall_m1 = cv2.inRange(hsv, (0, 100, 90), (5, 200, 125))
+        wall_m2 = cv2.inRange(hsv, (164, 93, 70), (180, 207, 201))
+        lab = cv2.bitwise_or(path_m, cv2.bitwise_or(wall_m1, wall_m2))
+        cv2.imshow("minimap/lab", lab)
+
+        ne = 0
+        nw = 0
+        se = 0
+        sw = 0
+
+        if p_xy is not None:
+            ne = check_rect(lab, p_xy, prev_p_xy, boss.offset["NE"])
+            nw = check_rect(lab, p_xy, prev_p_xy, boss.offset["NW"])
+            se = check_rect(lab, p_xy, prev_p_xy, boss.offset["SE"])
+            sw = check_rect(lab, p_xy, prev_p_xy, boss.offset["SW"])
+
+            cv2.circle(frame, p_xy, 2, (255, 255, 255), 2)
+            cv2.imshow("minimap/frame", frame)
+
+        print(f"ne={ne:.1f} nw={nw:.1f} se={se:.1f} sw={sw:.1f}")
+        cv2.waitKey(10)
+
+        if p_xy is not None:
+            prev_p_xy = p_xy
+
+    # # TEST is_near_exit
+    # while 1:
+    #     res, _ = boss.is_near_exit(
+    #         cv2.cvtColor(extract_game(maze.get_frame()), cv2.COLOR_BGR2HSV)
+    #     )
+    #     print(res)
+
+    ## TEST is_near_exit thresolds
+    # frame = extract_game(device.get_frame2())
+
+    # # Direction.SW
+    # cv2.rectangle(frame, (0, 260), (415, 630), (0, 255, 0), 1)
+    # cv2.rectangle(frame, (0, 260), (415, 630), (0, 255, 0), 1)
+
+    # # Direction.NE
+    # cv2.rectangle(frame, (395, 120), (830, 330), (255, 0, 0), 1)
+    # cv2.rectangle(frame, (395, 120), (830, 330), (255, 0, 0), 1)
+    # cv2.imshow("frame", frame)
+    # cv2.waitKey(0)

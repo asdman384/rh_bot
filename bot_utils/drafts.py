@@ -60,3 +60,16 @@ def print_pixels_array(mask):
     print(f"Coordinates of white pixels in NE_RECT: {coords}")
     for i in range(len(xs)):
         print(f"({ys[i] + Y}, {xs[i] + X}),")
+
+
+
+# # mask for minimap walls
+# mask1 = cv2.inRange(hsv, (0,100,90), (5,200,125))
+# mask2 = cv2.inRange(hsv, (164,93,70), (180,207,201))
+
+# # mask for minimap inner path
+# mask1 = cv2.inRange(hsv, (97,109,88), (123,193,125))
+
+# # mask for player dot
+# mask1 = cv2.inRange(hsv, (0,66,116), (7,109,170))
+# mask2 = cv2.inRange(hsv, (151,21,114), (180,127,206))

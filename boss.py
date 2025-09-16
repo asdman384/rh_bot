@@ -111,6 +111,7 @@ class Boss(ABC):
         self.exit_door_area_threshold = 3000
         self.enter_room_clicks = 12
         self.use_slide = True
+        self.exit_dbg_area: list = []
 
     @abstractmethod
     def start_fight(self, dir: Direction) -> None:
@@ -166,7 +167,7 @@ class Boss(ABC):
         dist = None
         for c in cnts:
             area = cv2.contourArea(c)
-            # print(area) if self.debug else None
+            print(area) if self.debug else None
             if area > self.exit_door_area_threshold:
                 M = cv2.moments(c)
                 if M["m00"] != 0:
@@ -185,6 +186,15 @@ class Boss(ABC):
 
             if verdict:
                 print(f"dist={dist}, area={area}")
+
+                if cx and cy:
+                    self.exit_dbg_area.append((cx, cy))
+
+                dbg = hsv.copy()
+                for x, y in self.exit_dbg_area:
+                    cv2.circle(dbg, (x, y), 6, (0, 0, 255), -1)
+                cv2.imshow("exit/DBG", dbg)
+                cv2.waitKey(1)
 
         return verdict, None
 
@@ -229,6 +239,7 @@ class Boss(ABC):
 class BossBhalor(Boss):
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
+        self._dist_thresh_px = 400
 
     def start_fight(self, dir: Direction) -> None:
         print("Fighting boss Bhalor...")
@@ -308,15 +319,25 @@ class BossBhalor(Boss):
 
         (mx, my), (x, y, w, h) = hit
 
-        # 3) дистанция до персонажа (если персонаж в центре камеры)
+        # 3) дистанция до персонажа (персонаж всегда в центре камеры)
         px, py = W // 2, H // 2
         dist = hypot(mx - px, my - py)
 
         verdict = dist <= self._dist_thresh_px
-        # TODO: fix direction logic
         # 4) направление выхода относительно персонажа (центр кадра)
-        #    (на самом деле, нужно не просто по координатам, а с учётом перспективы и возможного сдвига камеры)
-        dir = Direction.SW if (mx < px and my > 230) else Direction.NE
+        if (0 <= mx <= 330 and 135 <= my <= 594) or (
+            0 <= mx <= 460 and 180 <= my <= 594
+        ):
+            dir = Direction.SW
+        else:
+            dir = Direction.NE
+
+        if (340 <= mx <= 785 and 0 <= my <= 170) or (
+            470 <= mx <= 785 and 0 <= my <= 388
+        ):
+            dir = Direction.NE
+        else:
+            dir = Direction.SW
 
         if not self.debug:
             return verdict, dir
@@ -325,6 +346,14 @@ class BossBhalor(Boss):
         dbg = hsv.copy()
         cv2.circle(dbg, (mx, my), 8, (255, 0, 255), 2)
         cv2.circle(dbg, (px, py), 6, (0, 255, 0), -1)
+        # Direction.SW
+        cv2.rectangle(dbg, (0, 135), (330, 594), (0, 255, 0), 1)
+        cv2.rectangle(dbg, (0, 180), (460, 594), (0, 255, 0), 1)
+
+        # Direction.NE
+        cv2.rectangle(dbg, (340, 0), (785, 170), (255, 0, 0), 1)
+        cv2.rectangle(dbg, (470, 0), (785, 388), (255, 0, 0), 1)
+
         cv2.putText(
             dbg,
             f"dist={int(dist)}",
@@ -577,6 +606,78 @@ class BossElvira(Boss):
             time.sleep(0.15)
             return
 
+        time.sleep(1.5)  # wait for any animation to finish
+
+
+class BossMine(Boss):
+    mask = {
+        "player": {
+            "l1": (0, 66, 116),
+            "u1": (7, 109, 170),
+            "l2": (151, 21, 114),
+            "u2": (180, 127, 206),
+        },
+        "path": {
+            "l1": (97, 109, 88),
+            "u1": (123, 193, 125),
+            "l2": (97, 109, 88),
+            "u2": (123, 193, 125),
+        },
+    }
+
+    SW_GATE_LOW1 = (95, 170, 50)
+    SW_GATE_UPP1 = (96, 210, 68)
+    SW_GATE_LOW2 = (96, 164, 50)
+    SW_GATE_UPP2 = (97, 191, 68)
+    SW_GATE_LOW3 = (96, 164, 50)
+    SW_GATE_UPP3 = (97, 191, 68)
+
+    NE_GATE_LOW1 = (134, 173, 42)
+    NE_GATE_UPP1 = (138, 221, 75)
+    NE_GATE_LOW2 = (134, 173, 42)
+    NE_GATE_UPP2 = (138, 221, 75)
+
+    offset = {
+        "NE": (3, -10),
+        "NW": (-13, -11),
+        "SW": (-14, 2),
+        "SE": (4, 1),
+    }
+
+    def __init__(self, controller: Controller, debug: bool = False) -> None:
+        super().__init__(controller, debug)
+        self.fa_sense = True
+        self.fa_dir_cells = FA_KHANEL
+        self.fa_dir_threshold = {
+            "ne": 20,
+            "nw": 20,
+            "se": 20,
+            "sw": 20,
+        }
+        self._dist_thresh_px = 350
+        self.max_moves = 110
+        self.exit_door_area_threshold = 300
+        self.enter_room_clicks = 10
+        self.use_slide = False
+
+    def start_fight(self, dir: Direction) -> None:
+        if dir == Direction.NE:
+            self.controller.move_NE(15)
+
+    def open_chest(self, dir: Direction) -> None:
+        time.sleep(111111111)
+
+    def tavern_Route(self) -> None:
+        pass
+
+    def portal(self) -> None:
+        pass
+
+    def back(self) -> None:
+        raise
+
+    def fix_disaster(self):
+        time.sleep(0.5)  # wait for any animation to finish
         time.sleep(1.5)  # wait for any animation to finish
 
 
