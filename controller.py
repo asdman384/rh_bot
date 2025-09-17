@@ -16,6 +16,7 @@ class Controller:
     def __init__(self, device: Device, debug=False):
         self.device: Device = device
         self.debug = debug
+        self.use_click = False
 
     def press(self, x, y, time_ms=_delay):
         self.device.device.shell(f"input swipe {x} {y} {x} {y} {time_ms}")
@@ -86,7 +87,13 @@ class Controller:
         self._tap(self.skill_4_point if p is None else p)
 
     def _tap(self, xy: cv2.typing.Point):
-        self.device.device.shell(f"input tap {xy[0]} {xy[1]}", decode=False)
+        if self.use_click:
+            self.click(xy)
+        else:
+            self.device.device.shell(f"input tap {xy[0]} {xy[1]}", decode=False)
+
+    def click(self, xy: cv2.typing.Point):
+        self.device.click(xy)
 
     # Back button
     def back(self):
@@ -94,6 +101,9 @@ class Controller:
 
     def yes(self):
         return self._tap((740, 500))
+
+    def confirm(self):
+        return self._tap((740, 530))
 
     def attack(self):
         res = self.device.device.shell("input tap 1100 450")

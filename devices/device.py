@@ -6,7 +6,7 @@ import numpy as np
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 
-from devices.wincap import find_window_by_title, screenshot_window_np
+from devices.wincap import click_in_window, find_window_by_title, screenshot_window_np
 
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,9 @@ class Device:
         self._signer: Optional[PythonRSASigner] = None
         self.device: Optional[AdbDeviceTcp] = None
         self._hwnd = find_window_by_title("Rogue Hearts")
+
+    def click(self, xy: tuple[int, int]):
+        click_in_window(self._hwnd, xy[0], xy[1], button="left", double=False)
 
     def get_frame(self):
         """screenshoot from Android trough ADB"""

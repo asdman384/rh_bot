@@ -42,7 +42,10 @@ def print_pixels_array(mask):
     # SW_RECT_meta_khanel = ((186, 429), (100, 78))
     # SE_RECT_meta_khanel = ((500, 429), (100, 78))
     # NW_RECT_meta_bhalor = ((224, 239), (82, 55))
-    RECT_meta = ((224, 239), (82, 55))
+    # NE_RECT_meta_bhalor = ((490, 239), (82, 55))
+    # SW_RECT_meta_bhalor = ((191, 432), (101, 78))
+    # SE_RECT_meta_bhalor = ((505, 432), (103, 78))
+    RECT_meta = ((505, 432), (103, 78))
 
     X = RECT_meta[0][0]
     Y = RECT_meta[0][1]
@@ -52,15 +55,11 @@ def print_pixels_array(mask):
     cv2.rectangle(dbg, (X, Y), (X + W, Y + H), (255, 255, 255), 1)
     cv2.imshow("mask", dbg)
     cv2.waitKey(0)
-    # Print coordinates of all white pixels in NE_RECT
+    # Print coordinates of all white pixels in RECT
     roi = mask[Y : Y + H, X : X + W]
     ys, xs = np.where(roi == 255)
-
-    coords = list(zip(xs + X, ys + Y))
-    print(f"Coordinates of white pixels in NE_RECT: {coords}")
     for i in range(len(xs)):
         print(f"({ys[i] + Y}, {xs[i] + X}),")
-
 
 
 # # mask for minimap walls

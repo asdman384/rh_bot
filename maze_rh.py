@@ -3,7 +3,7 @@ import time
 import cv2
 import numpy as np
 
-from boss import Boss, BossDain, BossElvira, BossKhanel, BossMine
+from boss import Boss, BossBhalor, BossDain, BossElvira, BossKhanel, BossMine
 from bot_utils.drafts import print_pixels_array
 from controller import Controller
 from count_enemies import count_enemies
@@ -148,8 +148,114 @@ def fa_get_open_dirs(
     }
 
 
-def minimap_open_dirs(hsv: cv2.typing.MatLike):
-    pass
+def find_largest_contour_centroid(mask):
+    cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not cnts:
+        return None
+    c = max(cnts, key=cv2.contourArea)
+    M = cv2.moments(c)
+    if M["m00"] == 0:
+        return None
+    cx = int(M["m10"] / M["m00"])
+    cy = int(M["m01"] / M["m00"])
+    return (cx, cy)
+
+
+def player_mask(hsv: cv2.typing.MatLike, masks) -> cv2.typing.MatLike:
+    pm1 = cv2.inRange(hsv, masks["l1"], masks["u1"])
+    pm2 = cv2.inRange(hsv, masks["l2"], masks["u2"])
+    pm = cv2.bitwise_or(pm1, pm2)
+
+    # Чистим от шумов
+    kernel = np.ones((3, 3), np.uint8)
+    # pm = cv2.morphologyEx(pm, cv2.MORPH_OPEN, kernel, iterations=1)
+    pm = cv2.morphologyEx(pm, cv2.MORPH_CLOSE, kernel, iterations=1)
+    return pm
+
+
+def check_rect(frame, p_xy, prev_p_xy, offset) -> float:
+    white_count = 0
+    for x, y in RECT:
+        if prev_p_xy is not None:
+            p_xy = (
+                prev_p_xy[0] if abs(prev_p_xy[0] - p_xy[0]) > 10 else p_xy[0],
+                prev_p_xy[1] if abs(prev_p_xy[1] - p_xy[1]) > 10 else p_xy[1],
+            )
+
+        rect_x = x + p_xy[0] + offset[0]
+        rect_y = y + p_xy[1] + offset[1]
+
+        if rect_y >= 300 or rect_x >= 350:
+            continue
+
+        # frame[rect_y, rect_x] = 0
+
+        if frame[rect_y, rect_x] == 255:
+            white_count += 1
+
+    return white_count / len(RECT) * 100
+
+
+prev_p_xy = None
+
+
+def minimap_open_dirs(
+    frame: cv2.typing.MatLike,
+    masks,
+    threshold,
+    debug: bool = False,
+):
+    global prev_p_xy
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    pm = player_mask(hsv, masks["player"])
+    p_xy = find_largest_contour_centroid(pm)
+
+    path_m = cv2.inRange(hsv, masks["path"]["l1"], masks["path"]["u1"])
+    wall_m1 = cv2.inRange(hsv, masks["wall"]["l1"], masks["wall"]["u1"])
+    wall_m2 = cv2.inRange(hsv, masks["wall"]["l2"], masks["wall"]["u2"])
+    lab = cv2.bitwise_or(path_m, cv2.bitwise_or(wall_m1, wall_m2))
+
+    offset = {"NE": (3, -10), "NW": (-13, -11), "SW": (-14, 2), "SE": (4, 1)}
+
+    ne = 0
+    nw = 0
+    se = 0
+    sw = 0
+
+    if p_xy is None and prev_p_xy is not None:
+        p_xy = prev_p_xy
+
+    if p_xy is not None:
+        ne = check_rect(lab, p_xy, prev_p_xy, offset["NE"])
+        nw = check_rect(lab, p_xy, prev_p_xy, offset["NW"])
+        se = check_rect(lab, p_xy, prev_p_xy, offset["SE"])
+        sw = check_rect(lab, p_xy, prev_p_xy, offset["SW"])
+        cv2.circle(frame, p_xy, 2, (255, 255, 255), 2)
+
+    if p_xy is not None:
+        prev_p_xy = p_xy
+
+    if debug:
+        cv2.imshow("minimap/frame", frame)
+        cv2.imshow("minimap/pm", pm)
+        cv2.putText(
+            lab,
+            f"ne={ne:.1f} nw={nw:.1f} se={se:.1f} sw={sw:.1f}",
+            (10, 20),
+            0,
+            0.6,
+            (255, 255, 255),
+            1,
+        )
+        cv2.imshow("minimap/lab", lab)
+        cv2.waitKey(10)
+
+    return {
+        Direction.NE.label: ne > threshold["ne"],
+        Direction.NW.label: nw > threshold["nw"],
+        Direction.SE.label: se > threshold["se"],
+        Direction.SW.label: sw > threshold["sw"],
+    }
 
 
 class MazeRH:
@@ -199,9 +305,10 @@ class MazeRH:
         if move is None:
             raise AttributeError(f"Movement has no method move_{d.label}")
 
-        for _ in range(3 if self.fa_sense else 1):
+        steps = 3 if self.fa_sense else 2 if self.boss.minimap_sense else 1
+        for _ in range(steps):
             if self._enemies > 0:
-                slided = self._clear_enemies()
+                slided = self._clear_enemies(self.boss.use_slide)
             move()
             if self.fa_sense and _ != 2:
                 frame830x690 = extract_game(self.get_frame())
@@ -212,7 +319,9 @@ class MazeRH:
             if self._is_exit[0] and self._enemies == 0:
                 return True, slided
 
-        time.sleep(0.15)
+        if not self.boss.minimap_sense:
+            time.sleep(0.15)
+
         newFrame = self.sense()
         return self.fa_sense or self._is_moved(newFrame, d), slided
 
@@ -238,7 +347,7 @@ class MazeRH:
 
     def _clear_enemies(self, use_slide=True) -> bool:
         slided = False
-        if (self.moves - self.last_combat > 3) and self.boss.use_slide and use_slide:
+        if (self.moves - self.last_combat > 3) and use_slide:
             time.sleep(0.2)
             self.controller.skill_3()  # slide
             slided = True
@@ -280,6 +389,14 @@ class MazeRH:
         return frame
 
     def _open_dirs(self, bgr_full_frame):
+        if self.boss.minimap_sense:
+            return minimap_open_dirs(
+                extract_minimap(bgr_full_frame),
+                self.boss.masks,
+                self.boss.fa_dir_threshold,
+                self.debug,
+            )
+
         if self.fa_sense:
             return fa_get_open_dirs(
                 bgr_full_frame,
@@ -325,92 +442,65 @@ if __name__ == "__main__":
     device.connect()
     controller = Controller(device)
     # boss = BossKhanel(controller, False)
-    boss = BossMine(controller, True)
+    boss = BossBhalor(controller, True)
     maze = MazeRH(controller, boss, True)
 
-    def find_largest_contour_centroid(mask):
+    def pinkness_map(bgr: np.ndarray) -> np.ndarray:
+        # инвариант к яркости: берём доли каналов
+        b, g, r = cv2.split(bgr.astype(np.float32))
+        s = b + g + r + 1e-6
+        rb, gb, bb = r / s, g / s, b / s
+        # «розовость»: красный сильно больше зелёного/синего + уклон в мадженту
+        P = (rb - 0.5 * (gb + bb)) + 0.2 * (rb - bb)
+        P = cv2.GaussianBlur(P, (0, 0), 1.0)
+        P = cv2.normalize(P, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        return P
+
+    def find_pink_dot(bgr: np.ndarray, roi=None):
+        # при возможности ограничьте ROI областю миникарты: (x,y,w,h)
+        x = y = 0
+        if roi is not None:
+            x, y, w, h = roi
+            bgr = bgr[y : y + h, x : x + w]
+
+        P = pinkness_map(bgr)
+        # адаптивный порог (устойчив к смене тона)
+        thr, _ = cv2.threshold(P, 0, 255, cv2.THRESH_OTSU)
+        mask = cv2.morphologyEx(
+            (P > thr).astype(np.uint8) * 255,
+            cv2.MORPH_OPEN,
+            cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
+        )
+
+        # ищем маленький круглый блоб
         cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if not cnts:
-            return None
-        c = max(cnts, key=cv2.contourArea)
-        M = cv2.moments(c)
-        if M["m00"] == 0:
-            return None
-        cx = int(M["m10"] / M["m00"])
-        cy = int(M["m01"] / M["m00"])
-        return (cx, cy)
-
-    def player_mask(hsv: cv2.typing.MatLike) -> cv2.typing.MatLike:
-        pm1 = cv2.inRange(hsv, (0, 66, 116), (7, 109, 170))
-        pm2 = cv2.inRange(hsv, (151, 21, 114), (180, 127, 206))
-        pm = cv2.bitwise_or(pm1, pm2)
-
-        # Чистим от шумов
-        kernel = np.ones((5, 5), np.uint8)
-        pm = cv2.morphologyEx(pm, cv2.MORPH_OPEN, kernel, iterations=1)
-        # pm = cv2.morphologyEx(pm, cv2.MORPH_CLOSE, kernel, iterations=1)
-        return pm
-
-    def check_rect(frame, p_xy, prev_p_xy, offset) -> float:
-        white_count = 0
-        for x, y in RECT:
-            if prev_p_xy is not None:
-                p_xy = (
-                    prev_p_xy[0] if abs(prev_p_xy[0] - p_xy[0]) > 10 else p_xy[0],
-                    prev_p_xy[1] if abs(prev_p_xy[1] - p_xy[1]) > 10 else p_xy[1],
-                )
-
-            rect_x = x + p_xy[0] + offset[0]
-            rect_y = y + p_xy[1] + offset[1]
-
-            if rect_y >= 300 or rect_x >= 350:
+        best, best_score = None, -1
+        for c in cnts:
+            area = cv2.contourArea(c)
+            if not (5 <= area <= 400):  # подправьте под размер точки
                 continue
+            peri = cv2.arcLength(c, True) + 1e-6
+            circularity = 4 * np.pi * area / (peri * peri)  # 1 — идеальный круг
+            score = circularity * area  # круглый и не слишком мелкий
+            if score > best_score:
+                M = cv2.moments(c)
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
+                best = (x + cx, y + cy)
+                best_score = score
+        return best, mask  # центр точки (или None), маска на всякий случай
 
-            # frame[rect_y, rect_x] = 0
-
-            if frame[rect_y, rect_x] == 255:
-                white_count += 1
-
-        return white_count / len(RECT) * 100
-
-    frame = cv2.imread("frame.png", cv2.IMREAD_COLOR)
-
-    ## new sense
-    prev_p_xy = None
     while 1:
-        frame = extract_minimap(maze.get_frame())
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        # best, mask = find_pink_dot(maze.get_frame(), (0, 100, 350, 300))
+        # print(best)
+        # cv2.imshow("mask", mask)
+        # cv2.waitKey(10)
+        # maze.sense()
 
-        pm = player_mask(hsv)
-        cv2.imshow("minimap/pm", pm)
-
-        p_xy = find_largest_contour_centroid(pm)
-
-        path_m = cv2.inRange(hsv, (97, 109, 88), (123, 193, 125))
-        wall_m1 = cv2.inRange(hsv, (0, 100, 90), (5, 200, 125))
-        wall_m2 = cv2.inRange(hsv, (164, 93, 70), (180, 207, 201))
-        lab = cv2.bitwise_or(path_m, cv2.bitwise_or(wall_m1, wall_m2))
-        cv2.imshow("minimap/lab", lab)
-
-        ne = 0
-        nw = 0
-        se = 0
-        sw = 0
-
-        if p_xy is not None:
-            ne = check_rect(lab, p_xy, prev_p_xy, boss.offset["NE"])
-            nw = check_rect(lab, p_xy, prev_p_xy, boss.offset["NW"])
-            se = check_rect(lab, p_xy, prev_p_xy, boss.offset["SE"])
-            sw = check_rect(lab, p_xy, prev_p_xy, boss.offset["SW"])
-
-            cv2.circle(frame, p_xy, 2, (255, 255, 255), 2)
-            cv2.imshow("minimap/frame", frame)
-
-        print(f"ne={ne:.1f} nw={nw:.1f} se={se:.1f} sw={sw:.1f}")
-        cv2.waitKey(10)
-
-        if p_xy is not None:
-            prev_p_xy = p_xy
+        decoded = maze.get_frame()
+        frame830x690 = extract_game(decoded)
+        frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
+        maze._count_enemies(frame830x690hsv)
 
     # # TEST is_near_exit
     # while 1:

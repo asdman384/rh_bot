@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import win32gui
 import win32ui
+import win32con
 
 # Сделаем процесс DPI-aware, чтобы размеры не «плыли» на масштабировании Windows
 try:
@@ -98,6 +99,103 @@ def screenshot_window_np(hwnd: int, client_only: bool = False) -> np.ndarray:
     return arr  # np.ndarray BGR
 
 
+def _lparam(x, y):
+    return (y << 16) | (x & 0xFFFF)
+
+
+def _resolve_target_hwnd_and_point(hwnd, x, y):
+    """
+    По (x,y) в клиентских координатах hwnd находим реальный целевой дочерний hwnd,
+    который получил бы клик, и переводим точку в его клиентские координаты.
+    """
+    # (x,y) клиента -> экран
+    sx, sy = win32gui.ClientToScreen(hwnd, (x, y))
+
+    # Постараемся найти «реальный» дочерний, который получает мышь
+    child = None
+    if hasattr(win32gui, "RealChildWindowFromPoint"):
+        try:
+            child = win32gui.RealChildWindowFromPoint(hwnd, (sx, sy))
+        except Exception:
+            child = None
+
+    if not child or not win32gui.IsWindow(child):
+        # Фолбэк: ищем потомка относительно родителя
+        px, py = win32gui.ScreenToClient(hwnd, (sx, sy))
+        try:
+            child = win32gui.ChildWindowFromPoint(hwnd, (px, py))
+        except Exception:
+            child = None
+
+    target = child if child and win32gui.IsWindow(child) else hwnd
+    # Переведём точку в клиентские координаты target
+    tx, ty = win32gui.ScreenToClient(target, (sx, sy))
+    return target, tx, ty
+
+
+def click_in_window(hwnd, x, y, button="left", double=False, route_to_child=True):
+    """
+    Клик в окне по клиентским координатам (x,y).
+    - hwnd: дескриптор окна (HWND)
+    - x, y: координаты в СООБЩАЕМОМ окну (клиентская область top-level hwnd)
+    - button: "left" | "right" | "middle"
+    - double: True для двойного клика
+    - route_to_child: направлять сообщения непосредственно дочернему контролу под точкой
+    Работает без вывода окна на передний план.
+    """
+    if route_to_child:
+        target, tx, ty = _resolve_target_hwnd_and_point(hwnd, x, y)
+    else:
+        target, tx, ty = hwnd, x, y
+
+    btn = button.lower()
+    if btn == "left":
+        DOWN, UP, DBL, MK = (
+            win32con.WM_LBUTTONDOWN,
+            win32con.WM_LBUTTONUP,
+            win32con.WM_LBUTTONDBLCLK,
+            win32con.MK_LBUTTON,
+        )
+    elif btn == "right":
+        DOWN, UP, DBL, MK = (
+            win32con.WM_RBUTTONDOWN,
+            win32con.WM_RBUTTONUP,
+            win32con.WM_RBUTTONDBLCLK,
+            win32con.MK_RBUTTON,
+        )
+    elif btn == "middle":
+        DOWN, UP, DBL, MK = (
+            win32con.WM_MBUTTONDOWN,
+            win32con.WM_MBUTTONUP,
+            win32con.WM_MBUTTONDBLCLK,
+            win32con.MK_MBUTTON,
+        )
+    else:
+        raise ValueError("button must be 'left', 'right', or 'middle'")
+
+    lp = _lparam(tx, ty)
+
+    # Небольшая «прелюдия» — переместим мышь, чтобы некоторые UI корректно приняли координаты
+    win32gui.SendMessage(target, win32con.WM_MOUSEMOVE, 0, lp)
+
+    # Клик/даблклик
+    if double:
+        # Общепринятая последовательность двойного клика:
+        win32gui.SendMessage(target, DOWN, MK, lp)
+        win32gui.SendMessage(target, UP, 0, lp)
+        win32gui.SendMessage(target, DBL, MK, lp)
+        win32gui.SendMessage(target, UP, 0, lp)
+    else:
+        win32gui.SendMessage(target, DOWN, MK, lp)
+        win32gui.SendMessage(target, UP, 0, lp)
+
+
+# if __name__ == "__main__":
+#     hwnd = find_window_by_title("Блокнот")  # или "Notepad"
+#     # Кликнем в точку (50, 50) клиентской области
+#     click_in_window(hwnd, 50, 50, button="left", double=False)
+
+
 if __name__ == "__main__":
     import time
 
@@ -113,7 +211,6 @@ if __name__ == "__main__":
             now = time.time()
         return now
 
-    # Пример использования
     hwnd = find_window_by_title("Rogue Hearts")  # или часть названия: "Notepad"
     last = 0.0
     # while True:

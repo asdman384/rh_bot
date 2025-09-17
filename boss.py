@@ -7,8 +7,8 @@ import numpy as np
 
 from bot_utils.screenshoter import save_image
 from controller import Controller
-from db import FA_KHANEL
-from detect_location import find_tpl, wait_loading
+from db import FA_BHALOR, FA_KHANEL
+from detect_location import find_tpl, wait_for, wait_loading
 from devices.device import Device
 from model import Direction
 
@@ -94,6 +94,7 @@ def measure_fill_px(roi: cv2.typing.MatLike, debug=False) -> float:
 
 
 class Boss(ABC):
+    masks = None
     fa_dir_cells: dict[str, np.ndarray]
     fa_dir_threshold = {
         "ne": 18,
@@ -106,6 +107,7 @@ class Boss(ABC):
         self.controller = controller
         self.debug = debug
         self.fa_sense = False
+        self.minimap_sense = False
         self._dist_thresh_px = 300
         self.max_moves = 500
         self.exit_door_area_threshold = 3000
@@ -240,6 +242,8 @@ class BossBhalor(Boss):
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
         self._dist_thresh_px = 400
+        self.fa_sense = True
+        self.fa_dir_cells = FA_BHALOR
 
     def start_fight(self, dir: Direction) -> None:
         print("Fighting boss Bhalor...")
@@ -610,12 +614,16 @@ class BossElvira(Boss):
 
 
 class BossMine(Boss):
-    mask = {
+    masks = {
         "player": {
-            "l1": (0, 66, 116),
-            "u1": (7, 109, 170),
-            "l2": (151, 21, 114),
-            "u2": (180, 127, 206),
+            # "l1": (0, 66, 116),
+            # "u1": (7, 109, 170),
+            # "l2": (151, 21, 114),
+            # "u2": (180, 127, 206),
+            "l1": (150, 50, 134),
+            "u1": (180, 90, 170),
+            "l2": (150, 50, 134),
+            "u2": (180, 90, 170),
         },
         "path": {
             "l1": (97, 109, 88),
@@ -623,55 +631,147 @@ class BossMine(Boss):
             "l2": (97, 109, 88),
             "u2": (123, 193, 125),
         },
-    }
-
-    SW_GATE_LOW1 = (95, 170, 50)
-    SW_GATE_UPP1 = (96, 210, 68)
-    SW_GATE_LOW2 = (96, 164, 50)
-    SW_GATE_UPP2 = (97, 191, 68)
-    SW_GATE_LOW3 = (96, 164, 50)
-    SW_GATE_UPP3 = (97, 191, 68)
-
-    NE_GATE_LOW1 = (134, 173, 42)
-    NE_GATE_UPP1 = (138, 221, 75)
-    NE_GATE_LOW2 = (134, 173, 42)
-    NE_GATE_UPP2 = (138, 221, 75)
-
-    offset = {
-        "NE": (3, -10),
-        "NW": (-13, -11),
-        "SW": (-14, 2),
-        "SE": (4, 1),
+        "wall": {
+            "l1": (0, 100, 90),
+            "u1": (5, 200, 125),
+            "l2": (164, 93, 70),
+            "u2": (180, 207, 201),
+        },
     }
 
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
-        self.fa_sense = True
+        self.use_slide = False
+        self.fa_sense = False
+        self.minimap_sense = True
         self.fa_dir_cells = FA_KHANEL
         self.fa_dir_threshold = {
-            "ne": 20,
-            "nw": 20,
-            "se": 20,
-            "sw": 20,
+            "ne": 25,
+            "nw": 25,
+            "se": 25,
+            "sw": 25,
         }
         self._dist_thresh_px = 350
-        self.max_moves = 110
-        self.exit_door_area_threshold = 300
-        self.enter_room_clicks = 10
-        self.use_slide = False
+        self.max_moves = 1000
+        self.exit_door_area_threshold = 500
+        self.enter_room_clicks = 1
+        self.map_xy = None
 
     def start_fight(self, dir: Direction) -> None:
+        if dir is None:
+            print("dir not defined, cannot start fight")
+            return
+
+        print("Fighting boss Mine..." + dir.label)
+        # self.controller.use_click = True
+
         if dir == Direction.NE:
-            self.controller.move_NE(15)
+            self.controller.move_N(1)
+            time.sleep(0.15)
+            self.controller.move_N(1)
+            time.sleep(0.15)
+
+            for _ in range(10):
+                self.controller.move_NE(1)
+                time.sleep(0.15)
+
+            for _ in range(3):
+                self.controller.move_SE(1)
+                time.sleep(0.15)
+
+            for _ in range(10):
+                self.controller.move_SW(1)
+                time.sleep(0.15)
+
+        if dir == Direction.SW:
+            self.controller.move_W(1)
+            time.sleep(0.15)
+            self.controller.move_W(1)
+            time.sleep(0.15)
+
+            for _ in range(10):
+                self.controller.move_SW(1)
+                time.sleep(0.15)
+
+            for _ in range(3):
+                self.controller.move_SE(1)
+                time.sleep(0.15)
+
+            for _ in range(10):
+                self.controller.move_NE(1)
+                time.sleep(0.15)
+
+        # self.controller.use_click = False
 
     def open_chest(self, dir: Direction) -> None:
-        time.sleep(111111111)
+        pass
 
     def tavern_Route(self) -> None:
-        pass
+        if self.map_xy is None:
+            print("go Inventory")
+            self.controller._tap((880, 620))  # Inventory button
+            time.sleep(0.5)
+            frame = self._get_frame()
+            cv2.imshow("frame", frame)
+            cv2.setMouseCallback("frame", self._mouse_callback)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+            # close inventory
+            if wait_for("resources/inventory.png", lambda: self._get_frame(), 1):
+                self.controller.back()
+                time.sleep(0.5)
+
+        self.controller._tap((880, 620))  # Inventory button
+        if not wait_for("resources/inventory.png", lambda: self._get_frame(), 1):
+            raise "inventory problem 1"
+
+        self.controller._tap(self.map_xy)  # Map item
+        time.sleep(0.5)
+
+        self.controller._tap((1150, 630))  # Use button
+        time.sleep(0.5)
+
+        wait_loading(lambda: self._get_frame())
+
+        if wait_for("resources/inventory.png", lambda: self._get_frame(), 1):
+            time.sleep(1)
+            self.controller._tap((300, 300))  # Use button
+            time.sleep(0.1)
+            self.controller._tap((300, 300))  # Use button
+        else:
+            raise "inventory problem 2"
+
+        if wait_for("resources/mine.png", lambda: self._get_frame(), 5):
+            print("mine active")
+
+    def _mouse_callback(self, event, x, y, flags, param):
+        if event != cv2.EVENT_LBUTTONDOWN:
+            return
+        self.map_xy = (x, y)
+        print(f"map x={x}, y={y}")
 
     def portal(self) -> None:
-        pass
+        mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
+        mine_box, _ = find_tpl(
+            self._get_frame(), mine, score_threshold=0.7, debug=self.debug
+        )
+        print(mine_box)
+        cv2.waitKey(0)
+
+        if mine_box is None:
+            raise "mine_box problem"
+
+        self.controller.click((mine_box["x"], mine_box["y"]))
+        time.sleep(0.2)
+
+        if not wait_for("resources/hidden_mine.png", lambda: self._get_frame(), 5):
+            raise "mine_box click problem"
+
+        self.controller.confirm()
+        if not wait_for("resources/move_mine.png", lambda: self._get_frame(), 5):
+            raise "Mine enter problem"
+        self.controller.confirm()
 
     def back(self) -> None:
         raise
@@ -680,13 +780,19 @@ class BossMine(Boss):
         time.sleep(0.5)  # wait for any animation to finish
         time.sleep(1.5)  # wait for any animation to finish
 
+    def is_near_exit(self, hsv: cv2.typing.MatLike) -> tuple[bool, Direction | None]:
+        return False, None
+
 
 if __name__ == "__main__":
     device = Device("127.0.0.1", 58526)
     device.connect()
     boss = BossElvira(Controller(device), True)
 
-    boss.fix_disaster()
+    mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
+    mine_box, _ = find_tpl(boss._get_frame(), mine, score_threshold=0.7, debug=True)
+    cv2.waitKey(0)
+    boss.controller.click((mine_box["x"], mine_box["y"]))
     cv2.waitKey(0)
 
     # boss.start_fight(Direction.NE)

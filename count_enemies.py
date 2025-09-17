@@ -17,17 +17,32 @@ def count_enemies(hsv: cv.typing.MatLike, show_debug=False) -> int:
     # Пороговые размеры
     min_h = 5
     max_h = 8
-    min_w = 60
+    min_w = 20
     max_w = 70
 
     candidates = []
     for c in cnts:
         x, y, w, h = cv.boundingRect(c)
+
         if h < min_h or h > max_h:
             continue
         if w < min_w or w > max_w:
             continue
-        if w / max(h, 1) < 6.0:  # вытянутость по горизонтали
+
+        if show_debug:
+            cv.putText(
+                mask,
+                f"w={w}, h={h}",
+                (x, y - 10),
+                cv.FONT_HERSHEY_SIMPLEX,
+                0.3,
+                (255, 255, 255),
+                1,
+                cv.LINE_AA,
+            )
+            cv.imshow("count_enemies/DBG", mask)
+
+        if w / max(h, 1) < 2.5:  # вытянутость по горизонтали
             continue
         area = cv.contourArea(c)
         if area / (w * h) < 0.5:  # отсекаем «рваные» и рамки

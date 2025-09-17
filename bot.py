@@ -19,10 +19,9 @@ DEBUG = False
 device = Device("127.0.0.1", 58526)
 device.connect()
 controller = Controller(device, DEBUG)
-boss = BossKhanel(controller, DEBUG)
+boss = BossBhalor(controller, DEBUG)
 maze = MazeRH(controller, boss, DEBUG)
 explorer = Explorer(maze)
-
 
 # ---------------------- Main loop --------------------------
 run = 1
@@ -45,7 +44,7 @@ if __name__ == "__main__":
                 controller._tap((1055, 320))  # hit the enter button
                 time.sleep(3)
 
-            if run % 40 == 0:  # every N run
+            if type(boss) is not BossMine and run % 40 == 0:  # every N run
                 boss.back()
                 controller.flush_bag()
                 run = 1
@@ -59,7 +58,7 @@ if __name__ == "__main__":
             print(
                 f"Run #{run} Explorer finished with: {isSucces}, moves taken: {moves}, time: {time.time() - t0:.1f}s, dir: {dir.label if dir is not None else None}"
             )
-            if not isSucces:
+            if type(boss) is not BossMine and not isSucces:
                 name = f"fails/fail_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s).png"
                 print(name)
                 save_image(maze.get_frame(), name)
@@ -83,7 +82,8 @@ if __name__ == "__main__":
                 name = f"fails/fake-exit_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s).png"
                 print(name)
                 save_image(maze.get_frame(), name)
-                # raise
+                if type(boss) is BossMine:
+                    raise
                 boss.back()
                 continue
 

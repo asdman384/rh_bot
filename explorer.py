@@ -1,5 +1,5 @@
-from collections import deque
 import time
+from collections import deque
 from typing import Deque, Dict, List, Optional, Tuple
 
 import cv2
@@ -255,14 +255,14 @@ class Explorer:
 
 
 if __name__ == "__main__":
-    from boss import BossDain
+    from boss import BossDain, BossMine
     from controller import Controller
     from devices.device import Device
 
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
-    boss = BossDain(controller, False)
+    boss = BossMine(controller, False)
     maze = MazeRH(controller, boss, True)
     explorer = Explorer(maze, True)
 
