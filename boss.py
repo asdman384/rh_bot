@@ -106,7 +106,6 @@ class Boss(ABC):
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         self.controller = controller
         self.debug = debug
-        self.fa_sense = False
         self.minimap_sense = False
         self._dist_thresh_px = 300
         self.max_moves = 500
@@ -242,7 +241,6 @@ class BossBhalor(Boss):
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
         self._dist_thresh_px = 400
-        self.fa_sense = True
         self.fa_dir_cells = FA_BHALOR
 
     def start_fight(self, dir: Direction) -> None:
@@ -396,7 +394,6 @@ class BossKhanel(Boss):
 
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
-        self.fa_sense = True
         self._dist_thresh_px = 350
         self.max_moves = 100
         self.fa_dir_cells = FA_KHANEL
@@ -460,7 +457,6 @@ class BossDain(Boss):
 
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
-        self.fa_sense = True
         self._dist_thresh_px = 350
         self.max_moves = 100
         self.fa_dir_cells = FA_KHANEL
@@ -538,7 +534,6 @@ class BossElvira(Boss):
 
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
-        self.fa_sense = True
         self._dist_thresh_px = 350
         self.max_moves = 100
         self.fa_dir_cells = FA_KHANEL

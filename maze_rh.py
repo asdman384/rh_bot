@@ -7,13 +7,7 @@ from boss import Boss, BossBhalor, BossDain, BossElvira, BossKhanel, BossMine
 from bot_utils.drafts import print_pixels_array
 from controller import Controller
 from count_enemies import count_enemies
-from db import (
-    RECT,
-    NE_square,
-    NW_square,
-    SE_square,
-    SW_square,
-)
+from db import RECT
 from devices.device import Device
 from edges_diff import bytes_hamming, roi_edge_signature
 from model import Direction
@@ -70,31 +64,6 @@ def direction_possibility(dir: np.ndarray[tuple[int, int]], mask: np.ndarray) ->
     vals = mask[tuple(dir.T)]
     i = int((vals > 220).sum())
     return i / len(dir) * 100
-
-
-def get_open_dirs(frame300x200, debug=False):
-    hsv = cv2.cvtColor(frame300x200, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, LOWER, UPPER) | cv2.inRange(hsv, LOWER_1, UPPER_2)
-
-    ne = direction_possibility(NE_square, mask)
-    nw = direction_possibility(NW_square, mask)
-    se = direction_possibility(SE_square, mask)
-    sw = direction_possibility(SW_square, mask)
-
-    if debug:
-        put_labels(mask, f"NE:{ne:.1f}", (220, 35))
-        put_labels(mask, f"NW:{nw:.1f}", (10, 35))
-        put_labels(mask, f"SE:{se:.1f}", (220, 170))
-        put_labels(mask, f"SW:{sw:.1f}", (10, 170))
-        cv2.imshow("get_open_dirs/DBG", mask)
-        cv2.waitKey(1)
-
-    return {
-        Direction.NE.label: ne > 17,
-        Direction.NW.label: nw > 17,
-        Direction.SE.label: se > 17,
-        Direction.SW.label: sw > 17,
-    }
 
 
 def fa_get_open_dirs(
@@ -277,7 +246,6 @@ class MazeRH:
     ) -> None:
         self.controller = controller
         self.boss = boss
-        self.fa_sense = boss.fa_sense
         self.debug = debug
         self.moves = 0
         self.last_combat = 0
@@ -305,12 +273,13 @@ class MazeRH:
         if move is None:
             raise AttributeError(f"Movement has no method move_{d.label}")
 
-        steps = 3 if self.fa_sense else 2 if self.boss.minimap_sense else 1
+        steps = 2 if self.boss.minimap_sense else 3
         for _ in range(steps):
             if self._enemies > 0:
                 slided = self._clear_enemies(self.boss.use_slide)
             move()
-            if self.fa_sense and _ != 2:
+
+            if not self.boss.minimap_sense and _ != 2:
                 frame830x690 = extract_game(self.get_frame())
                 frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
                 self._enemies = self._count_enemies(frame830x690hsv)
@@ -323,7 +292,7 @@ class MazeRH:
             time.sleep(0.15)
 
         newFrame = self.sense()
-        return self.fa_sense or self._is_moved(newFrame, d), slided
+        return not self.boss.minimap_sense or self._is_moved(newFrame, d), slided
 
     def _is_moved(self, frame: cv2.typing.MatLike, d: Direction):
         # ttt = newFrame.copy()
@@ -376,13 +345,13 @@ class MazeRH:
         return self.controller.device.get_frame2()
 
     def _get_frame_fa(self) -> cv2.typing.MatLike:
-        if self.fa_sense:
+        if not self.boss.minimap_sense:
             self.controller._tap(self.controller.skill_1_point)
             time.sleep(0.1)
 
         frame = self.get_frame()
 
-        if self.fa_sense:
+        if not self.boss.minimap_sense:
             self.controller._tap(self.controller.skill_1_point_cancel)
             time.sleep(0.05)
 
@@ -397,14 +366,12 @@ class MazeRH:
                 self.debug,
             )
 
-        if self.fa_sense:
-            return fa_get_open_dirs(
-                bgr_full_frame,
-                self.boss.fa_dir_cells,
-                self.boss.fa_dir_threshold,
-                self.debug,
-            )
-        return get_open_dirs(extract_center(bgr_full_frame), self.debug)
+        return fa_get_open_dirs(
+            bgr_full_frame,
+            self.boss.fa_dir_cells,
+            self.boss.fa_dir_threshold,
+            self.debug,
+        )
 
     def sense(self) -> cv2.typing.MatLike:
         decoded = self._get_frame_fa()
@@ -421,7 +388,7 @@ class MazeRH:
 
         # detect possible directions
         self._direction_dict = self._open_dirs(
-            frame830x690 if self.fa_sense else decoded
+            frame830x690 if not self.boss.minimap_sense else decoded
         )
 
         # Check if all directions are zero
@@ -431,7 +398,7 @@ class MazeRH:
             decoded = self._get_frame_fa()
             frame830x690 = extract_game(decoded)
             self._direction_dict = self._open_dirs(
-                frame830x690 if self.fa_sense else decoded
+                frame830x690 if not self.boss.minimap_sense else decoded
             )
 
         return decoded
