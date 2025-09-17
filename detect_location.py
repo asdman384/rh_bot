@@ -23,7 +23,7 @@ def crop_loader_roi(frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
 def find_tpl(
     frame: cv2.typing.MatLike,
     tpl: cv2.typing.MatLike,  # IMREAD_COLOR
-    scales=np.linspace(1.0, 1.0, 3),
+    scales=[1.0],  # np.linspace(1.0, 1.0, 3)
     method=cv2.TM_CCOEFF_NORMED,
     score_threshold=0.9,
     debug=False,

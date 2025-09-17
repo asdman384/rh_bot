@@ -283,7 +283,7 @@ class MazeRH:
                 frame830x690 = extract_game(self.get_frame())
                 frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
                 self._enemies = self._count_enemies(frame830x690hsv)
-                self._is_exit = self.boss.is_near_exit(frame830x690hsv)
+                self._is_exit = self.boss.is_near_exit(frame830x690hsv, frame830x690)
 
             if self._is_exit[0] and self._enemies == 0:
                 return True, slided
@@ -380,7 +380,7 @@ class MazeRH:
 
         frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
         # detect exit
-        self._is_exit = self.boss.is_near_exit(frame830x690hsv)
+        self._is_exit = self.boss.is_near_exit(frame830x690hsv, frame830x690)
         # detect enemies
         self._enemies = self._count_enemies(frame830x690hsv)
         if self._enemies > 0:
@@ -409,8 +409,7 @@ if __name__ == "__main__":
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
-    # boss = BossKhanel(controller, False)
-    boss = BossBhalor(controller, True)
+    boss = BossDain(controller, True)
     maze = MazeRH(controller, boss, True)
 
     def pinkness_map(bgr: np.ndarray) -> np.ndarray:
@@ -458,26 +457,27 @@ if __name__ == "__main__":
                 best_score = score
         return best, mask  # центр точки (или None), маска на всякий случай
 
-    while 1:
-        # best, mask = find_pink_dot(maze.get_frame(), (0, 100, 350, 300))
-        # print(best)
-        # cv2.imshow("mask", mask)
-        # cv2.waitKey(10)
-        # maze.sense()
+    # while 1:
+    #     # best, mask = find_pink_dot(maze.get_frame(), (0, 100, 350, 300))
+    #     # print(best)
+    #     # cv2.imshow("mask", mask)
+    #     # cv2.waitKey(10)
+    #     # maze.sense()
 
-        decoded = maze.get_frame()
-        frame830x690 = extract_game(decoded)
-        frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
-        maze._count_enemies(frame830x690hsv)
+    #     decoded = maze.get_frame()
+    #     frame830x690 = extract_game(decoded)
+    #     frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
+    #     maze._count_enemies(frame830x690hsv)
 
     # # TEST is_near_exit
-    # while 1:
-    #     res, _ = boss.is_near_exit(
-    #         cv2.cvtColor(extract_game(maze.get_frame()), cv2.COLOR_BGR2HSV)
-    #     )
-    #     print(res)
+    while 1:
+        res, _ = boss.is_near_exit(
+            cv2.cvtColor(extract_game(maze.get_frame()), cv2.COLOR_BGR2HSV),
+            extract_game(maze.get_frame()),
+        )
+        print(res, _)
 
-    ## TEST is_near_exit thresolds
+    # # TEST is_near_exit thresolds
     # frame = extract_game(device.get_frame2())
 
     # # Direction.SW

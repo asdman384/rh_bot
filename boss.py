@@ -131,7 +131,9 @@ class Boss(ABC):
         self.controller.move_W() if dir == Direction.SW else self.controller.move_N()
         time.sleep(0.5)
 
-    def is_near_exit(self, hsv: cv2.typing.MatLike) -> tuple[bool, Direction | None]:
+    def is_near_exit(
+        self, hsv: cv2.typing.MatLike, bgr=None
+    ) -> tuple[bool, Direction | None]:
         """
         https://pseudopencv.site/utilities/hsvcolormask/
         """
@@ -313,7 +315,7 @@ class BossBhalor(Boss):
         center = (int(cx), int(cy))
         return (center, box), mask
 
-    def is_near_exit(self, hsv) -> tuple[bool, Direction | None]:
+    def is_near_exit(self, hsv, bgr=None) -> tuple[bool, Direction | None]:
         H, W = hsv.shape[:2]
         # 1) находим фиолетовую метку
         hit, mask = self.find_purple_marker(hsv)
@@ -444,17 +446,20 @@ class BossKhanel(Boss):
 
 
 class BossDain(Boss):
-    SW_GATE_LOW1 = (173, 67, 81)
-    SW_GATE_UPP1 = (179, 86, 95)
-    SW_GATE_LOW2 = (173, 67, 81)
-    SW_GATE_UPP2 = (179, 86, 95)
-    SW_GATE_LOW3 = (173, 67, 81)
-    SW_GATE_UPP3 = (179, 86, 95)
+    # SW_GATE_LOW1 = (173, 67, 81)
+    # SW_GATE_UPP1 = (179, 86, 95)
+    # SW_GATE_LOW2 = (173, 67, 81)
+    # SW_GATE_UPP2 = (179, 86, 95)
+    # SW_GATE_LOW3 = (173, 67, 81)
+    # SW_GATE_UPP3 = (179, 86, 95)
 
-    NE_GATE_LOW1 = (150, 67, 99)
-    NE_GATE_UPP1 = (159, 77, 115)
-    NE_GATE_LOW2 = (138, 88, 99)
-    NE_GATE_UPP2 = (142, 100, 107)
+    # NE_GATE_LOW1 = (150, 67, 99)
+    # NE_GATE_UPP1 = (159, 77, 115)
+    # NE_GATE_LOW2 = (138, 88, 99)
+    # NE_GATE_UPP2 = (142, 100, 107)
+
+    dain_sw_roi = (0, 260, 415, 640)
+    dain_ne_roi = (395, 120, 690, 340)
 
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
@@ -463,6 +468,29 @@ class BossDain(Boss):
         self.fa_dir_cells = FA_KHANEL
         self.exit_door_area_threshold = 300
         self.enter_room_clicks = 10
+        self.dain_sw = cv2.imread("resources/dain/sw.png")
+        self.dain_ne = cv2.imread("resources/dain/ne.png")
+
+    def is_near_exit(
+        self, hsv: cv2.typing.MatLike, bgr=None
+    ) -> tuple[bool, Direction | None]:
+        X, Y, X2, Y2 = self.dain_sw_roi
+        frame = cv2.resize(bgr[Y:Y2, X:X2], (X2 - X, Y2 - Y))
+        box, score = find_tpl(
+            frame, self.dain_sw, [1.0], score_threshold=0.61, debug=self.debug
+        )
+        if box is not None:
+            return True, Direction.SW
+
+        X, Y, X2, Y2 = self.dain_ne_roi
+        frame = cv2.resize(bgr[Y:Y2, X:X2], (X2 - X, Y2 - Y))
+        box, score = find_tpl(
+            frame, self.dain_ne, [1.0], score_threshold=0.42, debug=self.debug
+        )
+        if box is not None:
+            return True, Direction.NE
+
+        return False, None
 
     def start_fight(self, dir: Direction) -> None:
         print("Fighting boss Dain...")
@@ -776,7 +804,9 @@ class BossMine(Boss):
         time.sleep(0.5)  # wait for any animation to finish
         time.sleep(1.5)  # wait for any animation to finish
 
-    def is_near_exit(self, hsv: cv2.typing.MatLike) -> tuple[bool, Direction | None]:
+    def is_near_exit(
+        self, hsv: cv2.typing.MatLike, bgr=None
+    ) -> tuple[bool, Direction | None]:
         return False, None
 
 

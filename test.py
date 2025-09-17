@@ -3,7 +3,9 @@ import time
 import cv2
 import numpy as np
 
+from detect_location import find_tpl
 from devices.device import Device
+from maze_rh import extract_game
 
 # SIZE = 10
 # BUTTON_PLUS = (10, 10)
@@ -56,8 +58,36 @@ def mouse_callback(event, x, y, flags, param):
 device = Device("127.0.0.1", 58526)
 device.connect()
 
-frame = device.get_frame2().copy()
+dain_sw_roi = (0, 260, 415, 640)
+dain_ne_roi = (395, 120, 690, 340)
+
+
+dain_sw = cv2.imread("resources/dain/sw.png")
+dain_ne = cv2.imread("resources/dain/ne.png")
+
+while 1:
+    frame_game = extract_game(device.get_frame2())
+
+    t0 = time.time()
+    X, Y, X2, Y2 = dain_ne_roi
+    frame = cv2.resize(frame_game[Y:Y2, X:X2], (X2 - X, Y2 - Y))
+    box, score = find_tpl(frame, dain_ne, [1.0], score_threshold=0.42, debug=True)
+    print("ne: ", box is not None, score)
+
+    X, Y, X2, Y2 = dain_sw_roi
+    frame = cv2.resize(frame_game[Y:Y2, X:X2], (X2 - X, Y2 - Y))
+    box, score = find_tpl(frame, dain_sw, [1.0], score_threshold=0.42, debug=True)
+    print("sw: ", box is not None, score, time.time() - t0)
+
 cv2.circle(frame, (640, 290), 6, (0, 255, 0), -1)
 cv2.imshow("frame", frame)
 cv2.setMouseCallback("frame", mouse_callback)
 cv2.waitKey(0)
+
+# i = 0
+# while 1:
+#     i += 1
+#     frame = device.get_frame2().copy()
+#     cv2.imshow("frame", frame)
+#     cv2.imwrite(f"images/{i}.png", frame)
+#     cv2.waitKey(0)
