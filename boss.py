@@ -127,7 +127,7 @@ class Boss(ABC):
         self.controller.move_W() if dir == Direction.SW else self.controller.move_N()
         time.sleep(0.5)
         self.controller.skill_4()
-        time.sleep(2.6)
+        time.sleep(3)
         self.controller.move_W() if dir == Direction.SW else self.controller.move_N()
         time.sleep(0.5)
 
@@ -223,14 +223,14 @@ class Boss(ABC):
         self.controller.skill_1(p)  # focus arrow
         time.sleep(3.2)
         hp = measure_fill_px(extract_boss_health(self._get_frame()), self.debug)
-        print(f"Boss health after [focus arrow]: {hp:.1f} %")
+        print(f"Boss health after [focus arrow]: {hp:.1f} %") if self.debug else None
         return hp
 
     def _attk_barrage(self, p: cv2.typing.Point | None = None) -> float:
         self.controller.skill_2(p)  # barrage
         time.sleep(3.1)
         hp = measure_fill_px(extract_boss_health(self._get_frame()), self.debug)
-        print(f"Boss health after [barrage]: {hp:.1f} %")
+        print(f"Boss health after [barrage]: {hp:.1f} %") if self.debug else None
         return hp
 
     def fix_disaster(self):
@@ -242,9 +242,10 @@ class BossBhalor(Boss):
         super().__init__(controller, debug)
         self._dist_thresh_px = 400
         self.fa_dir_cells = FA_BHALOR
+        self.use_slide = False
 
     def start_fight(self, dir: Direction) -> None:
-        print("Fighting boss Bhalor...")
+        print("Fighting boss Bhalor...") if self.debug else None
         self.controller.skill_3(
             (590, 390) if dir == Direction.SW else (690, 320)
         )  # slide
@@ -468,36 +469,36 @@ class BossDain(Boss):
         self.controller.skill_3(
             (540, 360) if dir == Direction.SW else (640, 290)
         )  # slide
-        time.sleep(2)
+        time.sleep(2.2)
         self.controller.skill_3()  # elven blessing
-        time.sleep(1.4)
+        time.sleep(1.5)
 
         if dir == Direction.NE:
             hp = self._attk_barrage((690, 320))  # barrage
-            time.sleep(0.6)
+            time.sleep(2)
 
             if hp != 0:
                 hp = self._attk_barrage((730, 300))  # grenade
-                time.sleep(0.3)
+                time.sleep(2)
 
             if hp != 0:
                 hp = self._attk_focus_arrow()  # focus arrow
-                time.sleep(0.6)
+                time.sleep(2)
 
             if hp != 0:
                 hp = self._attk_focus_arrow()  # piercing arrow
 
         elif dir == Direction.SW:
             hp = self._attk_barrage((590, 390))  # barrage
-            time.sleep(0.6)
+            time.sleep(2)
 
             if hp != 0:
                 hp = self._attk_barrage((540, 430))  # grenade
-                time.sleep(0.3)
+                time.sleep(2)
 
             if hp != 0:
                 hp = self._attk_focus_arrow()  # focus arrow
-                time.sleep(0.6)
+                time.sleep(2)
 
             if hp != 0:
                 hp = self._attk_focus_arrow()  # piercing arrow

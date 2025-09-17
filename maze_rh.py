@@ -292,6 +292,7 @@ class MazeRH:
             time.sleep(0.15)
 
         newFrame = self.sense()
+        return self._is_moved(newFrame, d), slided
         return not self.boss.minimap_sense or self._is_moved(newFrame, d), slided
 
     def _is_moved(self, frame: cv2.typing.MatLike, d: Direction):

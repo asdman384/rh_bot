@@ -54,13 +54,13 @@ if __name__ == "__main__":
             boss.portal()
 
             # explore maze
-            isSucces, moves, dir = explorer.run(boss.max_moves, True, True)
+            isSucces, moves, dir = explorer.run(boss.max_moves, True, DEBUG)
             print(
                 f"Run #{run} Explorer finished with: {isSucces}, moves taken: {moves}, time: {time.time() - t0:.1f}s, dir: {dir.label if dir is not None else None}"
-            )
+            ) if DEBUG else None
             if type(boss) is not BossMine and not isSucces:
                 name = f"fails/fail_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s).png"
-                print(name)
+                print(f"----Run #{run}-------------{name}-----------{moves}---X")
                 save_image(maze.get_frame(), name)
                 boss.back()
                 continue
@@ -68,19 +68,19 @@ if __name__ == "__main__":
             cv2.destroyAllWindows()
 
             # enter gate
-            print("Entering gate...")
+            print("Entering gate...") if DEBUG else None
             if dir == Direction.NE:
                 controller.move_NE(boss.enter_room_clicks)
             elif dir == Direction.SW:
                 controller.move_SW(boss.enter_room_clicks)
 
             # wait for boss room
-            print("Waiting for boss room...")
+            print("Waiting for boss room...") if DEBUG else None
             if not wait_for_boss_popup(
                 lambda: maze.get_frame(), timeout_s=10, debug=DEBUG
             ):
                 name = f"fails/fake-exit_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s).png"
-                print(name)
+                print(f"----Run #{run}-------------{name}-----------{moves}---X")
                 save_image(maze.get_frame(), name)
                 if type(boss) is BossMine:
                     raise
@@ -91,13 +91,16 @@ if __name__ == "__main__":
             time.sleep(0.1)
 
             # fight boss
-            boss.start_fight(dir)
+            hp = boss.start_fight(dir)
 
             # close summary
-            if not wait_for(
-                "resources/figth_end.png",
-                lambda: extract_game(device.get_frame2()),
-                debug=DEBUG,
+            if (
+                not wait_for(
+                    "resources/figth_end.png",
+                    lambda: extract_game(device.get_frame2()),
+                    debug=DEBUG,
+                )
+                or hp != 0
             ):
                 print("figth_end not found")
                 winsound.Beep(5000, 300)
@@ -113,8 +116,9 @@ if __name__ == "__main__":
             name = (
                 f"images/run_{time.strftime('%H-%M-%S')}({time.time() - t0:.1f}s).png"
             )
-            # save_image(maze.get_frame(), name)
-            print(f"----Run #{run}-------------{name}-----------------------")
+            if moves is not None and moves > 130:
+                save_image(maze.get_frame(), name)
+            print(f"----Run #{run}-------------{name}-----------{moves}---V")
 
             run = run + 1
             boss.back()
