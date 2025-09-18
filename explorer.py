@@ -4,7 +4,7 @@ from typing import Deque, Dict, List, Optional, Tuple
 
 import cv2
 
-from boss import BossBhalor
+from boss import BossDain, BossBhalor
 from map_memory import MapMemory, draw_map_memory
 from maze_rh import MazeRH
 from model import ALL_DIRS, Direction, Pos
@@ -101,7 +101,10 @@ class Explorer:
                 ) if verbose else None
 
                 # TODO: return for all bosses
-                if type(self.maze.boss) is BossBhalor:
+                if (
+                    type(self.maze.boss) is BossBhalor
+                    or type(self.maze.boss) is BossDain
+                ):
                     return True, steps, exit[1]
                 # TODO: remove
                 # dir can be either SW or NE

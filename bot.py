@@ -19,7 +19,7 @@ DEBUG = False
 device = Device("127.0.0.1", 58526)
 device.connect()
 controller = Controller(device, DEBUG)
-boss = BossBhalor(controller, DEBUG)
+boss = BossDain(controller, DEBUG)
 maze = MazeRH(controller, boss, DEBUG)
 explorer = Explorer(maze)
 
@@ -111,7 +111,10 @@ if __name__ == "__main__":
             wait_loading(lambda: device.get_frame2(), wait_appearance=0.5, debug=DEBUG)
 
             # open chest
-            boss.open_chest(dir)
+            if not boss.open_chest(dir):
+                print("open chest fail")
+                winsound.Beep(5000, 300)
+                time.sleep(60)
 
             name = (
                 f"images/run_{time.strftime('%H-%M-%S')}({time.time() - t0:.1f}s).png"

@@ -113,6 +113,7 @@ class Boss(ABC):
         self.enter_room_clicks = 12
         self.use_slide = True
         self.exit_dbg_area: list = []
+        self.no_combat_minions = False
 
     @abstractmethod
     def start_fight(self, dir: Direction) -> None:
@@ -122,7 +123,7 @@ class Boss(ABC):
     def portal(self) -> None:
         pass
 
-    def open_chest(self, dir: Direction) -> None:
+    def open_chest(self, dir: Direction) -> bool:
         # open chest
         self.controller.move_W() if dir == Direction.SW else self.controller.move_N()
         time.sleep(0.5)
@@ -130,6 +131,7 @@ class Boss(ABC):
         time.sleep(3)
         self.controller.move_W() if dir == Direction.SW else self.controller.move_N()
         time.sleep(0.5)
+        return True
 
     def is_near_exit(
         self, hsv: cv2.typing.MatLike, bgr=None
@@ -470,6 +472,7 @@ class BossDain(Boss):
         self.enter_room_clicks = 10
         self.dain_sw = cv2.imread("resources/dain/sw.png")
         self.dain_ne = cv2.imread("resources/dain/ne.png")
+        self.no_combat_minions = True
 
     def is_near_exit(
         self, hsv: cv2.typing.MatLike, bgr=None
@@ -533,13 +536,22 @@ class BossDain(Boss):
 
         return hp
 
-    def open_chest(self, dir: Direction) -> None:
+    def open_chest(self, dir: Direction) -> bool:
         self.controller.move_SW() if dir == Direction.SW else self.controller.move_NE()
         time.sleep(0.5)
         self.controller.skill_4()
-        time.sleep(2.6)
-        self.controller.move_SW() if dir == Direction.SW else self.controller.move_NE()
+        time.sleep(2)
+        chest = f"resources/dain/{Direction.SW.label.lower()}_chest.png"
+        if wait_for(chest, self._get_frame, 1, 0.67, self.debug):
+            self.controller.attack()
+            time.sleep(3)
+
+        if wait_for(chest, self._get_frame, 0.1, 0.67, self.debug):
+            return False
+
+        self.controller.move_S() if dir == Direction.SW else self.controller.move_E()
         time.sleep(0.5)
+        return True
 
     def portal(self) -> None:
         self.controller._tap((1000, 630))  # page +1
@@ -609,13 +621,14 @@ class BossElvira(Boss):
 
         return hp
 
-    def open_chest(self, dir: Direction) -> None:
+    def open_chest(self, dir: Direction) -> bool:
         self.controller.move_SW() if dir == Direction.SW else self.controller.move_NE()
         time.sleep(0.5)
         self.controller.skill_4()
         time.sleep(2.6)
         self.controller.move_S() if dir == Direction.SW else self.controller.move_E()
         time.sleep(0.5)
+        return True
 
     def portal(self) -> None:
         self.controller._tap((1150, 450))  # select Elvira
@@ -680,6 +693,7 @@ class BossMine(Boss):
         self.exit_door_area_threshold = 500
         self.enter_room_clicks = 1
         self.map_xy = None
+        self.no_combat_minions = True
 
     def start_fight(self, dir: Direction) -> None:
         if dir is None:
@@ -727,8 +741,8 @@ class BossMine(Boss):
 
         # self.controller.use_click = False
 
-    def open_chest(self, dir: Direction) -> None:
-        pass
+    def open_chest(self, dir: Direction) -> bool:
+        return True
 
     def tavern_Route(self) -> None:
         if self.map_xy is None:
@@ -815,12 +829,18 @@ if __name__ == "__main__":
     device.connect()
     boss = BossElvira(Controller(device), True)
 
-    mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
-    mine_box, _ = find_tpl(boss._get_frame(), mine, score_threshold=0.7, debug=True)
-    cv2.waitKey(0)
-    boss.controller.click((mine_box["x"], mine_box["y"]))
-    cv2.waitKey(0)
+    # mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
+    # mine_box, _ = find_tpl(boss._get_frame(), mine, score_threshold=0.7, debug=True)
+    # cv2.waitKey(0)
+    # boss.controller.click((mine_box["x"], mine_box["y"]))
+    # cv2.waitKey(0)
 
+    res = wait_for(
+        "resources/dain/sw_chest.png", lambda: boss._get_frame(), 1, 0.3, True
+    )
+
+    print(res)
+    cv2.waitKey(0)
     # boss.start_fight(Direction.NE)
 
     # while 1:

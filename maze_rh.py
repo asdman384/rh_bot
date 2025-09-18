@@ -333,6 +333,9 @@ class MazeRH:
         return slided
 
     def _count_enemies(self, frame830x690hsv: cv2.typing.MatLike | None = None) -> int:
+        if self.boss.no_combat_minions:
+            return 0
+
         if frame830x690hsv is None:
             frame830x690hsv = cv2.cvtColor(
                 extract_game(self.get_frame()), cv2.COLOR_BGR2HSV
