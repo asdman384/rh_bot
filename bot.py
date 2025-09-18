@@ -10,7 +10,8 @@ from detect_boss_room import wait_for_boss_popup
 from detect_location import find_tpl, wait_for, wait_loading
 from devices.device import Device
 from explorer import Explorer
-from maze_rh import MazeRH, extract_game
+from frames import extract_game
+from maze_rh import MazeRH
 from model import Direction
 
 DEBUG = False
@@ -19,7 +20,8 @@ DEBUG = False
 device = Device("127.0.0.1", 58526)
 device.connect()
 controller = Controller(device, DEBUG)
-boss = BossDain(controller, DEBUG)
+boss = BossMine(controller, DEBUG)
+
 maze = MazeRH(controller, boss, DEBUG)
 explorer = Explorer(maze)
 
@@ -111,10 +113,10 @@ if __name__ == "__main__":
             wait_loading(lambda: device.get_frame2(), wait_appearance=0.5, debug=DEBUG)
 
             # open chest
-            if not boss.open_chest(dir):
+            if not boss.open_chest(dir) and type(boss) is BossDain:
                 print("open chest fail")
-                winsound.Beep(5000, 300)
-                time.sleep(60)
+                cv2.waitKey(0)
+                time.sleep(5)
 
             name = (
                 f"images/run_{time.strftime('%H-%M-%S')}({time.time() - t0:.1f}s).png"

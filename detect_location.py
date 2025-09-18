@@ -84,12 +84,21 @@ def find_tpl(
     }, best["score"]
 
 
-def wait_for(tpl_path, get_frame, timeout_s=8, score_threshold=0.9, debug=False):
+def wait_for(
+    tpl_path: str | cv2.typing.MatLike,
+    get_frame,
+    timeout_s=8,
+    score_threshold=0.9,
+    debug=False,
+):
     """
     get_frame() -> BGR кадр (np.ndarray).
     Ждём появления баннера до timeout_s. Возвращаем True/False.
     """
-    tpl = cv2.imread(str(tpl_path), cv2.IMREAD_COLOR)
+    if type(tpl_path) is str:
+        tpl = cv2.imread(str(tpl_path), cv2.IMREAD_COLOR)
+    else:
+        tpl = tpl_path
 
     t0 = time.time()
     while time.time() - t0 < timeout_s:

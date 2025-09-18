@@ -10,6 +10,7 @@ from count_enemies import count_enemies
 from db import RECT
 from devices.device import Device
 from edges_diff import bytes_hamming, roi_edge_signature
+from frames import extract_game
 from model import Direction
 
 LOWER = np.array([95, 90, 99])
@@ -49,14 +50,6 @@ def extract_minimap(frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
     Y = 100
     W = 350
     H = 300
-    return cv2.resize(frame[Y : Y + H, X : X + W], (W, H))
-
-
-def extract_game(frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
-    X = 240
-    Y = 0
-    W = 830
-    H = 690
     return cv2.resize(frame[Y : Y + H, X : X + W], (W, H))
 
 
@@ -412,72 +405,14 @@ if __name__ == "__main__":
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
-    boss = BossDain(controller, True)
+    boss = BossMine(controller, True)
     maze = MazeRH(controller, boss, True)
-
-    def pinkness_map(bgr: np.ndarray) -> np.ndarray:
-        # инвариант к яркости: берём доли каналов
-        b, g, r = cv2.split(bgr.astype(np.float32))
-        s = b + g + r + 1e-6
-        rb, gb, bb = r / s, g / s, b / s
-        # «розовость»: красный сильно больше зелёного/синего + уклон в мадженту
-        P = (rb - 0.5 * (gb + bb)) + 0.2 * (rb - bb)
-        P = cv2.GaussianBlur(P, (0, 0), 1.0)
-        P = cv2.normalize(P, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-        return P
-
-    def find_pink_dot(bgr: np.ndarray, roi=None):
-        # при возможности ограничьте ROI областю миникарты: (x,y,w,h)
-        x = y = 0
-        if roi is not None:
-            x, y, w, h = roi
-            bgr = bgr[y : y + h, x : x + w]
-
-        P = pinkness_map(bgr)
-        # адаптивный порог (устойчив к смене тона)
-        thr, _ = cv2.threshold(P, 0, 255, cv2.THRESH_OTSU)
-        mask = cv2.morphologyEx(
-            (P > thr).astype(np.uint8) * 255,
-            cv2.MORPH_OPEN,
-            cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
-        )
-
-        # ищем маленький круглый блоб
-        cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        best, best_score = None, -1
-        for c in cnts:
-            area = cv2.contourArea(c)
-            if not (5 <= area <= 400):  # подправьте под размер точки
-                continue
-            peri = cv2.arcLength(c, True) + 1e-6
-            circularity = 4 * np.pi * area / (peri * peri)  # 1 — идеальный круг
-            score = circularity * area  # круглый и не слишком мелкий
-            if score > best_score:
-                M = cv2.moments(c)
-                cx = int(M["m10"] / M["m00"])
-                cy = int(M["m01"] / M["m00"])
-                best = (x + cx, y + cy)
-                best_score = score
-        return best, mask  # центр точки (или None), маска на всякий случай
-
-    # while 1:
-    #     # best, mask = find_pink_dot(maze.get_frame(), (0, 100, 350, 300))
-    #     # print(best)
-    #     # cv2.imshow("mask", mask)
-    #     # cv2.waitKey(10)
-    #     # maze.sense()
-
-    #     decoded = maze.get_frame()
-    #     frame830x690 = extract_game(decoded)
-    #     frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
-    #     maze._count_enemies(frame830x690hsv)
 
     # # TEST is_near_exit
     while 1:
-        res, _ = boss.is_near_exit(
-            cv2.cvtColor(extract_game(maze.get_frame()), cv2.COLOR_BGR2HSV),
-            extract_game(maze.get_frame()),
-        )
+        frame830x690 = extract_game(maze.get_frame())
+        frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
+        res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
         print(res, _)
 
     # # TEST is_near_exit thresolds

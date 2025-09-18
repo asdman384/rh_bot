@@ -10,6 +10,7 @@ from controller import Controller
 from db import FA_BHALOR, FA_KHANEL
 from detect_location import find_tpl, wait_for, wait_loading
 from devices.device import Device
+from frames import extract_game
 from model import Direction
 
 
@@ -102,6 +103,8 @@ class Boss(ABC):
         "se": 22,
         "sw": 22,
     }
+    exit_sw_roi = (0, 260, 415, 640)
+    exit_ne_roi = (395, 120, 690, 340)
 
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         self.controller = controller
@@ -116,7 +119,7 @@ class Boss(ABC):
         self.no_combat_minions = False
 
     @abstractmethod
-    def start_fight(self, dir: Direction) -> None:
+    def start_fight(self, dir: Direction) -> int:
         pass
 
     @abstractmethod
@@ -248,7 +251,7 @@ class BossBhalor(Boss):
         self.fa_dir_cells = FA_BHALOR
         self.use_slide = False
 
-    def start_fight(self, dir: Direction) -> None:
+    def start_fight(self, dir: Direction) -> int:
         print("Fighting boss Bhalor...") if self.debug else None
         self.controller.skill_3(
             (590, 390) if dir == Direction.SW else (690, 320)
@@ -404,9 +407,9 @@ class BossKhanel(Boss):
         self.fa_dir_cells = FA_KHANEL
         self.exit_door_area_threshold = 5900
 
-    def start_fight(self, dir: Direction) -> None:
+    def start_fight(self, dir: Direction) -> int:
         if dir is None:
-            return
+            return 100
 
         print("Fighting boss Khanel..." + dir.label)
         self.controller.skill_3(
@@ -448,21 +451,6 @@ class BossKhanel(Boss):
 
 
 class BossDain(Boss):
-    # SW_GATE_LOW1 = (173, 67, 81)
-    # SW_GATE_UPP1 = (179, 86, 95)
-    # SW_GATE_LOW2 = (173, 67, 81)
-    # SW_GATE_UPP2 = (179, 86, 95)
-    # SW_GATE_LOW3 = (173, 67, 81)
-    # SW_GATE_UPP3 = (179, 86, 95)
-
-    # NE_GATE_LOW1 = (150, 67, 99)
-    # NE_GATE_UPP1 = (159, 77, 115)
-    # NE_GATE_LOW2 = (138, 88, 99)
-    # NE_GATE_UPP2 = (142, 100, 107)
-
-    dain_sw_roi = (0, 260, 415, 640)
-    dain_ne_roi = (395, 120, 690, 340)
-
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
         self._dist_thresh_px = 350
@@ -477,7 +465,7 @@ class BossDain(Boss):
     def is_near_exit(
         self, hsv: cv2.typing.MatLike, bgr=None
     ) -> tuple[bool, Direction | None]:
-        X, Y, X2, Y2 = self.dain_sw_roi
+        X, Y, X2, Y2 = self.exit_sw_roi
         frame = cv2.resize(bgr[Y:Y2, X:X2], (X2 - X, Y2 - Y))
         box, score = find_tpl(
             frame, self.dain_sw, [1.0], score_threshold=0.61, debug=self.debug
@@ -485,7 +473,7 @@ class BossDain(Boss):
         if box is not None:
             return True, Direction.SW
 
-        X, Y, X2, Y2 = self.dain_ne_roi
+        X, Y, X2, Y2 = self.exit_ne_roi
         frame = cv2.resize(bgr[Y:Y2, X:X2], (X2 - X, Y2 - Y))
         box, score = find_tpl(
             frame, self.dain_ne, [1.0], score_threshold=0.42, debug=self.debug
@@ -495,8 +483,8 @@ class BossDain(Boss):
 
         return False, None
 
-    def start_fight(self, dir: Direction) -> None:
-        print("Fighting boss Dain...")
+    def start_fight(self, dir: Direction) -> int:
+        print("Fighting boss Dain...") if self.debug else None
         self.controller.skill_3(
             (540, 360) if dir == Direction.SW else (640, 290)
         )  # slide
@@ -542,11 +530,13 @@ class BossDain(Boss):
         self.controller.skill_4()
         time.sleep(2)
         chest = f"resources/dain/{Direction.SW.label.lower()}_chest.png"
-        if wait_for(chest, self._get_frame, 1, 0.67, self.debug):
+        if wait_for(chest, self._get_frame, 1, 0.68, self.debug):
+            print("wait_for chest again?")
             self.controller.attack()
             time.sleep(3)
 
-        if wait_for(chest, self._get_frame, 0.1, 0.67, self.debug):
+        if wait_for(chest, self._get_frame, 0.1, 0.68, self.debug):
+            print("wait_for chest again? False")
             return False
 
         self.controller.move_S() if dir == Direction.SW else self.controller.move_E()
@@ -588,7 +578,7 @@ class BossElvira(Boss):
             "sw": 11,
         }
 
-    def start_fight(self, dir: Direction) -> None:
+    def start_fight(self, dir: Direction) -> int:
         if dir == Direction.NE:
             self.controller.move_NE()
             time.sleep(0.4)
@@ -653,10 +643,6 @@ class BossElvira(Boss):
 class BossMine(Boss):
     masks = {
         "player": {
-            # "l1": (0, 66, 116),
-            # "u1": (7, 109, 170),
-            # "l2": (151, 21, 114),
-            # "u2": (180, 127, 206),
             "l1": (150, 50, 134),
             "u1": (180, 90, 170),
             "l2": (150, 50, 134),
@@ -683,65 +669,114 @@ class BossMine(Boss):
         self.minimap_sense = True
         self.fa_dir_cells = FA_KHANEL
         self.fa_dir_threshold = {
-            "ne": 25,
-            "nw": 25,
-            "se": 25,
-            "sw": 25,
+            "ne": 40,
+            "nw": 40,
+            "se": 40,
+            "sw": 40,
         }
         self._dist_thresh_px = 350
         self.max_moves = 1000
         self.exit_door_area_threshold = 500
-        self.enter_room_clicks = 1
+        self.enter_room_clicks = 8
         self.map_xy = None
         self.no_combat_minions = True
+        self.mine_sw = cv2.imread("resources/mine/mine_sw.png")
+        self.mine_ne = cv2.imread("resources/mine/mine_ne.png")
 
-    def start_fight(self, dir: Direction) -> None:
+    def is_near_exit(
+        self, hsv: cv2.typing.MatLike, bgr=None
+    ) -> tuple[bool, Direction | None]:
+        X, Y, X2, Y2 = self.exit_sw_roi
+        frame = cv2.resize(bgr[Y:Y2, X:X2], (X2 - X, Y2 - Y))
+        box, score = find_tpl(
+            frame, self.mine_sw, [1.0], score_threshold=0.62, debug=self.debug
+        )
+        if box is not None:
+            return True, Direction.SW
+
+        X, Y, X2, Y2 = self.exit_ne_roi
+        frame = cv2.resize(bgr[Y:Y2, X:X2], (X2 - X, Y2 - Y))
+        box, score = find_tpl(
+            frame, self.mine_ne, [1.0], score_threshold=0.72, debug=self.debug
+        )
+        if box is not None:
+            return True, Direction.NE
+
+        return False, None
+
+    def start_fight(self, dir: Direction) -> int:
         if dir is None:
             print("dir not defined, cannot start fight")
-            return
+            return 100
 
         print("Fighting boss Mine..." + dir.label)
-        # self.controller.use_click = True
 
-        if dir == Direction.NE:
-            self.controller.move_N(1)
-            time.sleep(0.15)
-            self.controller.move_N(1)
-            time.sleep(0.15)
+        ne_route = [
+            self.controller.move_N,
+            self.controller.move_N,
+            self.controller.move_NE,
+            self.controller.move_NE,
+            self.controller.move_NE,
+            self.controller.move_NE,
+            self.controller.move_NE,
+            self.controller.move_NE,
+            self.controller.move_NE,
+            self.controller.move_SE,
+            self.controller.move_SE,
+            self.controller.move_SE,
+            self.controller.move_SW,
+            self.controller.move_SW,
+            self.controller.move_SW,
+            self.controller.move_SW,
+            self.controller.move_SW,
+            self.controller.move_SW,
+            self.controller.move_SW,
+        ]
+        ne_route.reverse()
 
-            for _ in range(10):
-                self.controller.move_NE(1)
-                time.sleep(0.15)
+        sw_route = [
+            self.controller.move_W,
+            self.controller.move_W,
+            self.controller.move_SW,
+            self.controller.move_SW,
+            self.controller.move_SW,
+            self.controller.move_SW,
+            self.controller.move_SW,
+            self.controller.move_SW,
+            self.controller.move_SW,
+            self.controller.move_SE,
+            self.controller.move_SE,
+            self.controller.move_SE,
+            self.controller.move_NE,
+            self.controller.move_NE,
+            self.controller.move_NE,
+            self.controller.move_NE,
+            self.controller.move_NE,
+            self.controller.move_NE,
+            self.controller.move_NE,
+        ]
+        sw_route.reverse()
 
-            for _ in range(3):
-                self.controller.move_SE(1)
-                time.sleep(0.15)
+        route = ne_route if dir == Direction.NE else sw_route
+        tpl = cv2.imread("resources/figth_end.png", cv2.IMREAD_COLOR)
 
-            for _ in range(10):
-                self.controller.move_SW(1)
-                time.sleep(0.15)
+        while len(route) > 0:
+            route.pop()()
+            if wait_for(
+                tpl,
+                lambda: extract_game(self._get_frame()),
+                timeout_s=0.6,
+                debug=self.debug,
+            ):
+                break
 
-        if dir == Direction.SW:
-            self.controller.move_W(1)
-            time.sleep(0.15)
-            self.controller.move_W(1)
-            time.sleep(0.15)
-
-            for _ in range(10):
-                self.controller.move_SW(1)
-                time.sleep(0.15)
-
-            for _ in range(3):
-                self.controller.move_SE(1)
-                time.sleep(0.15)
-
-            for _ in range(10):
-                self.controller.move_NE(1)
-                time.sleep(0.15)
-
-        # self.controller.use_click = False
+        print("Finish boss Mine..." + dir.label)
+        return 0
 
     def open_chest(self, dir: Direction) -> bool:
+        self.controller.move_NE()
+        time.sleep(0.1)
+        self.controller.move_SW()
         return True
 
     def tavern_Route(self) -> None:
@@ -774,14 +809,12 @@ class BossMine(Boss):
 
         if wait_for("resources/inventory.png", lambda: self._get_frame(), 1):
             time.sleep(1)
-            self.controller._tap((300, 300))  # Use button
-            time.sleep(0.1)
-            self.controller._tap((300, 300))  # Use button
+            self.controller.back()
         else:
             raise "inventory problem 2"
 
-        if wait_for("resources/mine.png", lambda: self._get_frame(), 5):
-            print("mine active")
+        if not wait_for("resources/mine.png", lambda: self._get_frame(), 5, 0.74):
+            print("mine not active")
 
     def _mouse_callback(self, event, x, y, flags, param):
         if event != cv2.EVENT_LBUTTONDOWN:
@@ -794,8 +827,6 @@ class BossMine(Boss):
         mine_box, _ = find_tpl(
             self._get_frame(), mine, score_threshold=0.7, debug=self.debug
         )
-        print(mine_box)
-        cv2.waitKey(0)
 
         if mine_box is None:
             raise "mine_box problem"
@@ -810,37 +841,31 @@ class BossMine(Boss):
         if not wait_for("resources/move_mine.png", lambda: self._get_frame(), 5):
             raise "Mine enter problem"
         self.controller.confirm()
-
-    def back(self) -> None:
-        raise
+        wait_loading(self._get_frame, 1)
 
     def fix_disaster(self):
         time.sleep(0.5)  # wait for any animation to finish
         time.sleep(1.5)  # wait for any animation to finish
 
-    def is_near_exit(
-        self, hsv: cv2.typing.MatLike, bgr=None
-    ) -> tuple[bool, Direction | None]:
-        return False, None
-
 
 if __name__ == "__main__":
     device = Device("127.0.0.1", 58526)
     device.connect()
-    boss = BossElvira(Controller(device), True)
+    boss = BossMine(Controller(device), True)
+    # boss.start_fight(Direction.NE)
 
     # mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
     # mine_box, _ = find_tpl(boss._get_frame(), mine, score_threshold=0.7, debug=True)
-    # cv2.waitKey(0)
+    cv2.waitKey(0)
     # boss.controller.click((mine_box["x"], mine_box["y"]))
     # cv2.waitKey(0)
 
-    res = wait_for(
-        "resources/dain/sw_chest.png", lambda: boss._get_frame(), 1, 0.3, True
-    )
+    # res = wait_for(
+    #     "resources/dain/sw_chest.png", lambda: boss._get_frame(), 1, 0.3, True
+    # )
 
-    print(res)
-    cv2.waitKey(0)
+    # print(res)
+    # cv2.waitKey(0)
     # boss.start_fight(Direction.NE)
 
     # while 1:

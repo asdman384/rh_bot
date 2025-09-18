@@ -5,7 +5,6 @@ import numpy as np
 
 from detect_location import find_tpl
 from devices.device import Device
-from maze_rh import extract_game
 
 # SIZE = 10
 # BUTTON_PLUS = (10, 10)
