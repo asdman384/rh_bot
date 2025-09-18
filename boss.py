@@ -677,7 +677,7 @@ class BossMine(Boss):
         self._dist_thresh_px = 350
         self.max_moves = 1000
         self.exit_door_area_threshold = 500
-        self.enter_room_clicks = 8
+        self.enter_room_clicks = 6
         self.map_xy = None
         self.no_combat_minions = True
         self.mine_sw = cv2.imread("resources/mine/mine_sw.png")
@@ -834,14 +834,16 @@ class BossMine(Boss):
         self.controller.click((mine_box["x"], mine_box["y"]))
         time.sleep(0.2)
 
-        if not wait_for("resources/hidden_mine.png", lambda: self._get_frame(), 5):
+        if not wait_for("resources/hidden_mine.png", self._get_frame, 6):
             raise "mine_box click problem"
 
         self.controller.confirm()
-        if not wait_for("resources/move_mine.png", lambda: self._get_frame(), 5):
+        if not wait_for("resources/move_mine.png", self._get_frame):
             raise "Mine enter problem"
+        wait_loading(self._get_frame, 0.5)
         self.controller.confirm()
-        wait_loading(self._get_frame, 1)
+        wait_loading(self._get_frame, 0.5)
+        self.controller.confirm()
 
     def fix_disaster(self):
         time.sleep(0.5)  # wait for any animation to finish

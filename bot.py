@@ -108,9 +108,9 @@ if __name__ == "__main__":
                 winsound.Beep(5000, 300)
                 time.sleep(60)
 
-            wait_loading(lambda: device.get_frame2(), wait_appearance=0.5, debug=DEBUG)
+            wait_loading(device.get_frame2, wait_appearance=0.5, debug=DEBUG)
             controller._tap((1280 // 2, 690 // 2))
-            wait_loading(lambda: device.get_frame2(), wait_appearance=0.5, debug=DEBUG)
+            wait_loading(device.get_frame2, wait_appearance=0.5, debug=DEBUG)
 
             # open chest
             if not boss.open_chest(dir) and type(boss) is BossDain:
@@ -128,7 +128,7 @@ if __name__ == "__main__":
             run = run + 1
             boss.back()
     finally:
-        boss.back()
+        boss.back() if type(boss) is not BossMine else None
         cv2.destroyAllWindows()
         device.close()
         winsound.Beep(2000, 300)
