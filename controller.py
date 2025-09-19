@@ -113,9 +113,10 @@ class Controller:
 
     def wait_loading(self, wait_appearance=0.5, timeout=1):
         wait_loading(
-            lambda: self.device.get_frame2(),
+            self.device.get_frame2,
             wait_appearance=wait_appearance,
             timeout=timeout,
+            retry=self.yes,
             debug=self.debug,
         )
 

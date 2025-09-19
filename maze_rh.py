@@ -245,6 +245,7 @@ class MazeRH:
 
     def init_camera(self) -> None:
         # Initial move to get the camera right
+        self._last_frame = None
         self.controller.move_SE()
         self.controller.move_NW()
         self._is_exit = (False, None)
@@ -275,7 +276,7 @@ class MazeRH:
             if not self.boss.minimap_sense and _ != 2:
                 frame830x690 = extract_game(self.get_frame())
                 frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
-                self._enemies = self._count_enemies(frame830x690hsv)
+                self._enemies = self._count_enemies(frame830x690hsv, frame830x690)
                 self._is_exit = self.boss.is_near_exit(frame830x690hsv, frame830x690)
 
             if self._is_exit[0] and self._enemies == 0:
@@ -325,9 +326,15 @@ class MazeRH:
 
         return slided
 
-    def _count_enemies(self, frame830x690hsv: cv2.typing.MatLike | None = None) -> int:
+    def _count_enemies(
+        self,
+        frame830x690hsv: cv2.typing.MatLike | None = None,
+        frame830x690: cv2.typing.MatLike | None = None,
+    ) -> int:
         if self.boss.no_combat_minions:
-            return 0
+            return self.boss.count_enemies(
+                extract_game(self.get_frame()) if frame830x690 is None else frame830x690
+            )
 
         if frame830x690hsv is None:
             frame830x690hsv = cv2.cvtColor(
@@ -378,7 +385,7 @@ class MazeRH:
         # detect exit
         self._is_exit = self.boss.is_near_exit(frame830x690hsv, frame830x690)
         # detect enemies
-        self._enemies = self._count_enemies(frame830x690hsv)
+        self._enemies = self._count_enemies(frame830x690hsv, frame830x690)
         if self._enemies > 0:
             self._clear_enemies(False)
             time.sleep(1)

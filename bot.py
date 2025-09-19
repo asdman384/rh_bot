@@ -20,7 +20,7 @@ DEBUG = False
 device = Device("127.0.0.1", 58526)
 device.connect()
 controller = Controller(device, DEBUG)
-boss = BossMine(controller, DEBUG)
+boss = BossDain(controller, DEBUG)
 
 maze = MazeRH(controller, boss, DEBUG)
 explorer = Explorer(maze)
@@ -56,18 +56,18 @@ if __name__ == "__main__":
             boss.portal()
 
             # explore maze
-            isSucces, moves, dir = explorer.run(boss.max_moves, True, DEBUG)
+            isSucces, moves, dir = explorer.run(boss.max_moves, True, boss.debug)
             print(
                 f"Run #{run} Explorer finished with: {isSucces}, moves taken: {moves}, time: {time.time() - t0:.1f}s, dir: {dir.label if dir is not None else None}"
             ) if DEBUG else None
-            if type(boss) is not BossMine and not isSucces:
+            if not isSucces:
                 name = f"fails/fail_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s).png"
                 print(f"----Run #{run}-------------{name}-----------{moves}---X")
                 save_image(maze.get_frame(), name)
+                if type(boss) is BossMine:
+                    raise
                 boss.back()
                 continue
-
-            cv2.destroyAllWindows()
 
             # enter gate
             print("Entering gate...") if DEBUG else None

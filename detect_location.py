@@ -3,6 +3,8 @@ import time
 import cv2
 import numpy as np
 
+from frames import extract_game
+
 
 def preprocess(img_bgr):
     # Упор на форму светлой ленты: серый + лёгкое сглаживание + контраст
@@ -62,11 +64,11 @@ def find_tpl(
         cv2.putText(
             out,
             f"score={best['score']:.2f}, scale={best['scale']:.2f}",
-            (x, max(0, y - 10)),
+            (max(0, x - 20), max(0, y - 10)),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (0, 255, 0),
-            2,
+            0.5,
+            (0, 235, 0),
+            1,
         )
         cv2.imshow("DBG/find_tpl", out)
         cv2.waitKey(1)
@@ -116,11 +118,12 @@ def wait_for(
     return False
 
 
-def wait_loading(get_frame2, wait_appearance=3, timeout=30, debug=False):
+def wait_loading(get_frame, wait_appearance=3, timeout=30, retry=None, debug=False):
     print("start wait_loading") if debug else None
     loader_1 = cv2.imread("resources/loader_1.png", cv2.IMREAD_COLOR)
     loader_2 = cv2.imread("resources/loader_2.png", cv2.IMREAD_COLOR)
     loader_3 = cv2.imread("resources/loader_3.png", cv2.IMREAD_COLOR)
+    net_error = cv2.imread("resources/net_error.png", cv2.IMREAD_COLOR)
 
     def found(frame: cv2.typing.MatLike) -> bool:
         box1, _ = find_tpl(frame, loader_1, score_threshold=0.95, debug=debug)
@@ -130,14 +133,25 @@ def wait_loading(get_frame2, wait_appearance=3, timeout=30, debug=False):
 
     t0 = time.time()
     while time.time() - t0 < wait_appearance:
-        if found(crop_loader_roi(get_frame2())):
+        frame = get_frame()
+        if find_tpl(extract_game(frame), net_error)[0] is not None:
+            retry() if retry is not None else None
+            wait_loading(get_frame, wait_appearance, timeout, retry, debug)
+
+        if found(crop_loader_roi(frame)):
             print(f"found loader after {time.time() - t0}s") if debug else None
             t1 = time.time()
             while time.time() - t1 < timeout:
-                if not found(crop_loader_roi(get_frame2())):
+                frame = get_frame()
+                if find_tpl(extract_game(frame), net_error)[0] is not None:
+                    retry() if retry is not None else None
+                    wait_loading(get_frame, wait_appearance, timeout, retry, debug)
+
+                if not found(crop_loader_roi(frame)):
                     print(
                         f"disappeared loader after {time.time() - t1}s"
                     ) if debug else None
+                    # TODO: check network connection and retry if tpl found
                     return True
             print(f"Loader still exists after {timeout}s") if debug else None
 

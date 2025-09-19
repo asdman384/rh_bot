@@ -206,6 +206,9 @@ class Boss(ABC):
 
         return verdict, None
 
+    def count_enemies(self, frame830x690: cv2.typing.MatLike | None = None) -> int:
+        return 0
+
     def _get_frame(self) -> cv2.typing.MatLike:
         return self.controller.device.get_frame2()
 
@@ -219,11 +222,7 @@ class Boss(ABC):
         self.controller.back()
         time.sleep(0.2)
         self.controller._tap((740, 500))  # select yes
-        wait_loading(
-            lambda: self.controller.device.get_frame2(),
-            wait_appearance=1,
-            debug=self.debug,
-        )
+        wait_loading(self._get_frame, wait_appearance=1, debug=self.debug)
         time.sleep(2.5)
 
     def _attk_focus_arrow(self, p: cv2.typing.Point | None = None) -> float:
@@ -667,21 +666,22 @@ class BossMine(Boss):
         self.use_slide = False
         self.fa_sense = False
         self.minimap_sense = True
-        self.fa_dir_cells = FA_KHANEL
         self.fa_dir_threshold = {
             "ne": 40,
             "nw": 40,
             "se": 40,
             "sw": 40,
         }
-        self._dist_thresh_px = 350
+        self._dist_thresh_px = 400
         self.max_moves = 1000
-        self.exit_door_area_threshold = 500
-        self.enter_room_clicks = 6
+        self.enter_room_clicks = 5
         self.map_xy = None
         self.no_combat_minions = True
         self.mine_sw = cv2.imread("resources/mine/mine_sw.png")
         self.mine_ne = cv2.imread("resources/mine/mine_ne.png")
+        self.enemy1 = cv2.imread("resources/mine/enemy1.png")
+        self.enemy2 = cv2.imread("resources/mine/enemy2.png")
+        self.debug = True
 
     def is_near_exit(
         self, hsv: cv2.typing.MatLike, bgr=None
@@ -689,7 +689,7 @@ class BossMine(Boss):
         X, Y, X2, Y2 = self.exit_sw_roi
         frame = cv2.resize(bgr[Y:Y2, X:X2], (X2 - X, Y2 - Y))
         box, score = find_tpl(
-            frame, self.mine_sw, [1.0], score_threshold=0.62, debug=self.debug
+            frame, self.mine_sw, [1.0], score_threshold=0.53, debug=self.debug
         )
         if box is not None:
             return True, Direction.SW
@@ -703,6 +703,24 @@ class BossMine(Boss):
             return True, Direction.NE
 
         return False, None
+
+    def count_enemies(self, frame830x690: cv2.typing.MatLike) -> int:
+        px, py = 830 // 2, 690 // 2
+        box, score = find_tpl(
+            frame830x690, self.enemy1, [1.0], score_threshold=0.62, debug=self.debug
+        )
+        if box is not None:
+            dist = hypot(box["cx"] - px, box["cy"] - py)
+            return 1 if dist < 271 else 0
+
+        box, score = find_tpl(
+            frame830x690, self.enemy2, [1.0], score_threshold=0.62, debug=self.debug
+        )
+        if box is not None:
+            dist = hypot(box["cx"] - px, box["cy"] - py)
+            return 1 if dist < 271 else 0
+
+        return 0
 
     def start_fight(self, dir: Direction) -> int:
         if dir is None:
@@ -721,9 +739,10 @@ class BossMine(Boss):
             self.controller.move_NE,
             self.controller.move_NE,
             self.controller.move_NE,
+            self.controller.move_NE,
+            self.controller.move_E,
             self.controller.move_SE,
-            self.controller.move_SE,
-            self.controller.move_SE,
+            self.controller.move_S,
             self.controller.move_SW,
             self.controller.move_SW,
             self.controller.move_SW,
@@ -744,9 +763,10 @@ class BossMine(Boss):
             self.controller.move_SW,
             self.controller.move_SW,
             self.controller.move_SW,
+            self.controller.move_SW,
+            self.controller.move_S,
             self.controller.move_SE,
-            self.controller.move_SE,
-            self.controller.move_SE,
+            self.controller.move_E,
             self.controller.move_NE,
             self.controller.move_NE,
             self.controller.move_NE,
@@ -758,16 +778,17 @@ class BossMine(Boss):
         sw_route.reverse()
 
         route = ne_route if dir == Direction.NE else sw_route
-        tpl = cv2.imread("resources/figth_end.png", cv2.IMREAD_COLOR)
+        fight_end = cv2.imread("resources/figth_end.png", cv2.IMREAD_COLOR)
+        step = 0
 
         while len(route) > 0:
             route.pop()()
-            if wait_for(
-                tpl,
-                lambda: extract_game(self._get_frame()),
-                timeout_s=0.6,
-                debug=self.debug,
-            ):
+            step += 1
+            if step < 12:
+                time.sleep(0.1)
+                continue
+            if wait_for(fight_end, lambda: extract_game(self._get_frame()), 0.6):
+                wait_loading(self._get_frame, 0.5)
                 break
 
         print("Finish boss Mine..." + dir.label)
@@ -791,12 +812,12 @@ class BossMine(Boss):
             cv2.destroyAllWindows()
 
             # close inventory
-            if wait_for("resources/inventory.png", lambda: self._get_frame(), 1):
+            if wait_for("resources/inventory.png", self._get_frame, 1):
                 self.controller.back()
                 time.sleep(0.5)
 
         self.controller._tap((880, 620))  # Inventory button
-        if not wait_for("resources/inventory.png", lambda: self._get_frame(), 1):
+        if not wait_for("resources/inventory.png", self._get_frame, 1):
             raise "inventory problem 1"
 
         self.controller._tap(self.map_xy)  # Map item
@@ -805,15 +826,15 @@ class BossMine(Boss):
         self.controller._tap((1150, 630))  # Use button
         time.sleep(0.5)
 
-        wait_loading(lambda: self._get_frame())
+        wait_loading(self._get_frame)
 
-        if wait_for("resources/inventory.png", lambda: self._get_frame(), 1):
+        if wait_for("resources/inventory.png", self._get_frame, 1):
             time.sleep(1)
             self.controller.back()
         else:
             raise "inventory problem 2"
 
-        if not wait_for("resources/mine.png", lambda: self._get_frame(), 5, 0.74):
+        if not wait_for("resources/mine.png", self._get_frame, 5, 0.74):
             print("mine not active")
 
     def _mouse_callback(self, event, x, y, flags, param):
@@ -824,9 +845,7 @@ class BossMine(Boss):
 
     def portal(self) -> None:
         mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
-        mine_box, _ = find_tpl(
-            self._get_frame(), mine, score_threshold=0.7, debug=self.debug
-        )
+        mine_box, _ = find_tpl(self._get_frame(), mine, score_threshold=0.7)
 
         if mine_box is None:
             raise "mine_box problem"
@@ -838,16 +857,15 @@ class BossMine(Boss):
             raise "mine_box click problem"
 
         self.controller.confirm()
+        self.controller.wait_loading(1)
         if not wait_for("resources/move_mine.png", self._get_frame):
             raise "Mine enter problem"
-        wait_loading(self._get_frame, 0.5)
-        self.controller.confirm()
-        wait_loading(self._get_frame, 0.5)
-        self.controller.confirm()
+        self.controller.wait_loading(0.5)
+        self.controller.back()
+        time.sleep(0.1)
 
     def fix_disaster(self):
-        time.sleep(0.5)  # wait for any animation to finish
-        time.sleep(1.5)  # wait for any animation to finish
+        time.sleep(1)  # wait for any animation to finish
 
 
 if __name__ == "__main__":
