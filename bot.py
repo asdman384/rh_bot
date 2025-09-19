@@ -20,8 +20,8 @@ DEBUG = False
 device = Device("127.0.0.1", 58526)
 device.connect()
 controller = Controller(device, DEBUG)
+# 💀 💀 💀
 boss = BossDain(controller, DEBUG)
-
 maze = MazeRH(controller, boss, DEBUG)
 explorer = Explorer(maze)
 
@@ -33,13 +33,13 @@ if __name__ == "__main__":
             t0 = time.time()
             # detecting start position
             monetia = cv2.imread("resources/monetia.png", cv2.IMREAD_COLOR)
-            monetia_box, _ = find_tpl(maze.get_frame(), monetia, score_threshold=0.9)
+            monetia_box, _ = find_tpl(boss._get_frame(), monetia, score_threshold=0.9)
             if monetia_box:
                 controller._tap((monetia_box["x"], monetia_box["y"]))
                 time.sleep(3)
 
             pub = cv2.imread("resources/pub3.png", cv2.IMREAD_COLOR)
-            pub_box, _ = find_tpl(maze.get_frame(), pub, score_threshold=0.9)
+            pub_box, _ = find_tpl(boss._get_frame(), pub, score_threshold=0.9)
             if pub_box:
                 controller._tap((pub_box["x"], pub_box["y"]))
                 time.sleep(0.5)
@@ -62,8 +62,8 @@ if __name__ == "__main__":
             ) if DEBUG else None
             if not isSucces:
                 name = f"fails/fail_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s).png"
-                print(f"----Run #{run}-------------{name}-----------{moves}---X")
-                save_image(maze.get_frame(), name)
+                print(f"❌----Run #{run}-------------{name}-----------{moves}---")
+                save_image(boss._get_frame(), name)
                 if type(boss) is BossMine:
                     raise
                 boss.back()
@@ -78,12 +78,10 @@ if __name__ == "__main__":
 
             # wait for boss room
             print("Waiting for boss room...") if DEBUG else None
-            if not wait_for_boss_popup(
-                lambda: maze.get_frame(), timeout_s=10, debug=DEBUG
-            ):
+            if not wait_for_boss_popup(boss._get_frame, timeout_s=10, debug=DEBUG):
                 name = f"fails/fake-exit_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s).png"
-                print(f"----Run #{run}-------------{name}-----------{moves}---X")
-                save_image(maze.get_frame(), name)
+                print(f"❌----Run #{run}-------------{name}-----------{moves}---")
+                save_image(boss._get_frame(), name)
                 if type(boss) is BossMine:
                     raise
                 boss.back()
@@ -93,7 +91,9 @@ if __name__ == "__main__":
             time.sleep(0.1)
 
             # fight boss
+            boss.debug = True
             hp = boss.start_fight(dir)
+            boss.debug = False
 
             # close summary
             if (
@@ -122,8 +122,8 @@ if __name__ == "__main__":
                 f"images/run_{time.strftime('%H-%M-%S')}({time.time() - t0:.1f}s).png"
             )
             if moves is not None and moves > 130:
-                save_image(maze.get_frame(), name)
-            print(f"----Run #{run}-------------{name}-----------{moves}---V")
+                save_image(boss._get_frame(), name)
+            print(f"✅----Run #{run}-------------{name}-----------{moves}---")
 
             run = run + 1
             boss.back()

@@ -74,7 +74,7 @@ def measure_fill_px(roi: cv2.typing.MatLike, debug=False) -> float:
         cv2.putText(
             roi,
             f"bx={bx}, w={W}, area={area}, w={w} h={h}",
-            (10, 10),
+            (10, 8),
             0,
             0.4,
             (0, 255, 0),
@@ -234,7 +234,7 @@ class Boss(ABC):
 
     def _attk_barrage(self, p: cv2.typing.Point | None = None) -> float:
         self.controller.skill_2(p)  # barrage
-        time.sleep(3.1)
+        time.sleep(3.2)
         hp = measure_fill_px(extract_boss_health(self._get_frame()), self.debug)
         print(f"Boss health after [barrage]: {hp:.1f} %") if self.debug else None
         return hp
@@ -499,18 +499,20 @@ class BossDain(Boss):
         ]
 
         sw_routine = [
+            lambda: self._attk_barrage((530, 430)),  # grenade
+            self._attk_barrage,  # barrage
             self._attk_focus_arrow,  # piercing arrow
-            self._attk_focus_arrow,  # focus arrow
-            lambda: self._attk_barrage((540, 430)),  # grenade
-            lambda: self._attk_barrage((590, 390)),  # barrage
+            lambda: self._attk_focus_arrow((480, 470)),  # focus arrow
         ]
 
         routine = ne_routine if dir == Direction.NE else sw_routine
         hp, prev_hp = 100, 100
         while hp > 0 and len(routine) > 0:
             phase_change = prev_hp > 50 and hp < 50
-            print("phase_change: ", phase_change) if self.debug else None
-            time.sleep(1.5) if phase_change else None
+            print(
+                f"steps left: {len(routine)} phase_change: {phase_change}"
+            ) if self.debug else None
+            time.sleep(1.5) if phase_change or len(routine) == 1 else None
             prev_hp = hp
             hp = routine.pop()()
 
@@ -866,7 +868,7 @@ if __name__ == "__main__":
     device = Device("127.0.0.1", 58526)
     device.connect()
     boss = BossDain(Controller(device), True)
-    boss.start_fight(Direction.NE)
+    boss.start_fight(Direction.SW)
 
     # mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
     # mine_box, _ = find_tpl(boss._get_frame(), mine, score_threshold=0.7, debug=True)

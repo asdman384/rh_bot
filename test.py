@@ -59,6 +59,10 @@ device.connect()
 
 frame = device.get_frame2()
 
+for _ in range(156):
+    device.click((557, 370))
+    time.sleep(0.05)
+
 cv2.imshow("frame", frame)
 cv2.setMouseCallback("frame", mouse_callback)
 cv2.waitKey(0)
