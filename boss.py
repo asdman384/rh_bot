@@ -222,7 +222,7 @@ class Boss(ABC):
         self.controller.back()
         time.sleep(0.2)
         self.controller._tap((740, 500))  # select yes
-        wait_loading(self._get_frame, wait_appearance=1, debug=self.debug)
+        self.controller.wait_loading(1)
         time.sleep(2.5)
 
     def _attk_focus_arrow(self, p: cv2.typing.Point | None = None) -> float:
@@ -487,40 +487,34 @@ class BossDain(Boss):
         self.controller.skill_3(
             (540, 360) if dir == Direction.SW else (640, 290)
         )  # slide
-        time.sleep(2.2)
+        time.sleep(2)
         self.controller.skill_3()  # elven blessing
         time.sleep(1.5)
 
-        if dir == Direction.NE:
-            hp = self._attk_barrage((690, 320))  # barrage
-            time.sleep(2)
+        ne_routine = [
+            self._attk_focus_arrow,  # piercing arrow
+            self._attk_focus_arrow,  # focus arrow
+            lambda: self._attk_barrage((730, 300)),  # grenade
+            lambda: self._attk_barrage((690, 320)),  # barrage
+        ]
 
-            if hp != 0:
-                hp = self._attk_barrage((730, 300))  # grenade
-                time.sleep(2)
+        sw_routine = [
+            self._attk_focus_arrow,  # piercing arrow
+            self._attk_focus_arrow,  # focus arrow
+            lambda: self._attk_barrage((540, 430)),  # grenade
+            lambda: self._attk_barrage((590, 390)),  # barrage
+        ]
 
-            if hp != 0:
-                hp = self._attk_focus_arrow()  # focus arrow
-                time.sleep(2)
+        routine = ne_routine if dir == Direction.NE else sw_routine
+        hp, prev_hp = 100, 100
+        while hp > 0 and len(routine) > 0:
+            phase_change = prev_hp > 50 and hp < 50
+            print("phase_change: ", phase_change) if self.debug else None
+            time.sleep(1.5) if phase_change else None
+            prev_hp = hp
+            hp = routine.pop()()
 
-            if hp != 0:
-                hp = self._attk_focus_arrow()  # piercing arrow
-
-        elif dir == Direction.SW:
-            hp = self._attk_barrage((590, 390))  # barrage
-            time.sleep(2)
-
-            if hp != 0:
-                hp = self._attk_barrage((540, 430))  # grenade
-                time.sleep(2)
-
-            if hp != 0:
-                hp = self._attk_focus_arrow()  # focus arrow
-                time.sleep(2)
-
-            if hp != 0:
-                hp = self._attk_focus_arrow()  # piercing arrow
-
+        print("Finished boss Dain...") if self.debug else None
         return hp
 
     def open_chest(self, dir: Direction) -> bool:
@@ -871,8 +865,8 @@ class BossMine(Boss):
 if __name__ == "__main__":
     device = Device("127.0.0.1", 58526)
     device.connect()
-    boss = BossMine(Controller(device), True)
-    # boss.start_fight(Direction.NE)
+    boss = BossDain(Controller(device), True)
+    boss.start_fight(Direction.NE)
 
     # mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
     # mine_box, _ = find_tpl(boss._get_frame(), mine, score_threshold=0.7, debug=True)

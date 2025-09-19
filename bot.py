@@ -89,7 +89,7 @@ if __name__ == "__main__":
                 boss.back()
                 continue
 
-            controller._tap((1280 // 2, 690 // 2))
+            controller.yes()
             time.sleep(0.1)
 
             # fight boss
@@ -108,9 +108,9 @@ if __name__ == "__main__":
                 winsound.Beep(5000, 300)
                 time.sleep(60)
 
-            wait_loading(device.get_frame2, wait_appearance=0.5, debug=DEBUG)
-            controller._tap((1280 // 2, 690 // 2))
-            wait_loading(device.get_frame2, wait_appearance=0.5, debug=DEBUG)
+            controller.wait_loading(0.5)
+            controller.yes()
+            controller.wait_loading(0.5)
 
             # open chest
             if not boss.open_chest(dir) and type(boss) is BossDain:
