@@ -5,7 +5,7 @@ from typing import Optional, List
 
 import cv2
 import numpy as np
-from telegram import InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardMarkup, Update, BotCommand
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -35,6 +35,8 @@ class TelegramBot:
         self.token = token
         self.admin_users = admin_users or []
         self.application = Application.builder().token(token).build()
+        # Optional: list of BotCommand to expose in Telegram's input menu
+        self._commands: List[BotCommand] | None = None
         self._setup_handlers()
 
     def _setup_handlers(self):
@@ -113,6 +115,9 @@ class TelegramBot:
         self.application.add_handler(CommandHandler(command, handler_func))
         logger.info(f"Добавлен обработчик для команды: /{command}")
 
+    def set_command_list(self, commands: List[tuple[str, str]]):
+        self._commands = [BotCommand(cmd, desc) for cmd, desc in commands]
+
     async def notify_admins(self, message: str):
         """Отправляет сообщение всем администраторам из конфига"""
         if not self.admin_users:
@@ -134,6 +139,9 @@ class TelegramBot:
         """Запуск бота"""
         logger.info("Запуск Telegram бота...")
         await self.application.initialize()
+        # Apply bot commands so Telegram shows menu button with pop-up suggestions
+        if self._commands:
+            await self.application.bot.set_my_commands(self._commands)
         await self.application.start()
         await self.application.updater.start_polling()
 

@@ -36,6 +36,21 @@ class GameBotService:
         self.bot.add_command_handler("start_game_bot", self.start)
         self.bot.add_command_handler("stop_game_bot", self.stop)
         self.bot.add_command_handler("click", self.click)
+        # Зарегистрировать список команд для меню Telegram
+        self.bot.set_command_list(
+            [
+                ("screenshot", "Отправить скриншот окна"),
+                ("window", "Информация об окне"),
+                ("start_game", "Запустить игру"),
+                ("click", "Клик по координатам /click x y"),
+                ("start_game_bot", "Запустить игровой бот"),
+                ("close_game", "Закрыть игру"),
+                ("help", "Справка по командам"),
+                ("ping", "Проверить связь"),
+                ("status", "Статус сервиса"),
+                ("stop_game_bot", "Остановить игровой бот (don't work)"),
+            ]
+        )
         self.bot.welcome_message.append("/screenshot - получить текущий скриншот\n\n")
         self.bot.welcome_message.append("/window - получить информацию об окне\n\n")
         self.bot.welcome_message.append("/status - показать статус бота\n\n")
