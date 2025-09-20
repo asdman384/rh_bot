@@ -100,7 +100,8 @@ class Boss(ABC):
         "se": 22,
         "sw": 22,
     }
-    exit_sw_tpl_roi = (0, 260, 415, 640)
+    # exit_sw_tpl_roi = (0, 260, 415, 640) # old
+    exit_sw_tpl_roi = (60, 290, 365, 600)
     exit_ne_tpl_roi = (395, 120, 690, 340)
 
     def __init__(self, controller: Controller, debug: bool = False) -> None:
@@ -229,7 +230,7 @@ class Boss(ABC):
         X, Y, X2, Y2 = self.exit_sw_tpl_roi
         frame = cv2.resize(bgr[Y:Y2, X:X2], (X2 - X, Y2 - Y))
         box, score = find_tpl(
-            frame, self.exit_tpl_sw, [1.0], score_threshold=0.53, debug=self.debug
+            frame, self.exit_tpl_sw, [1.0], score_threshold=0.77, debug=self.debug
         )
         if box is not None:
             return True, Direction.SW

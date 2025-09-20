@@ -51,7 +51,7 @@ def main():
 
             if type(boss) is not BossMine and run % 40 == 0:  # every N run
                 boss.back()
-                controller.flush_bag()
+                controller.flush_bag(decompose=False)
                 run = 1
                 continue
 

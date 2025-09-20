@@ -135,7 +135,7 @@ class Controller:
                 time.sleep(3)
             monetia_box, _ = find_tpl(get_frame(), monetia, debug=self.debug)
 
-    def flush_bag(self) -> bool:
+    def flush_bag(self, decompose=True) -> bool:
         print("flush bag")
         black = cv2.imread("resources/black.png", cv2.IMREAD_COLOR)
         black_box, _ = find_tpl(self.device.get_frame2(), black, score_threshold=0.9)
@@ -158,28 +158,31 @@ class Controller:
         time.sleep(1)
 
         # Decompose routine
-        self._tap((1060, 320))  # Decompose button
-        time.sleep(1)
-        for x in range(680, 1081, 100):
-            self._tap((x, 450))  # Select Items
-            time.sleep(0.05)
+        if decompose:
+            print("decompose items")
+            self._tap((1060, 320))  # Decompose button
+            time.sleep(1)
+            for x in range(680, 1081, 100):
+                self._tap((x, 450))  # Select Items
+                time.sleep(0.05)
 
-        self._tap((1140, 360))  # Decompose action button
-        time.sleep(0.5)
-        check_box, _ = find_tpl(
-            self.device.get_frame2(),
-            cv2.imread("resources/check_grade.png", cv2.IMREAD_COLOR),
-            score_threshold=0.9,
-        )
-        if check_box is not None:
-            self._tap((740, 500))  # Confirm button
+            self._tap((1140, 360))  # Decompose action button
+            time.sleep(0.5)
+            check_box, _ = find_tpl(
+                self.device.get_frame2(),
+                cv2.imread("resources/check_grade.png", cv2.IMREAD_COLOR),
+                score_threshold=0.9,
+            )
+            if check_box is not None:
+                self._tap((740, 500))  # Confirm button
 
-        self.wait_loading(2)
-        time.sleep(0.5)
-        self.back()
-        time.sleep(0.5)
+            self.wait_loading(2)
+            time.sleep(0.5)
+            self.back()
+            time.sleep(0.5)
 
         # Trade routine
+        print("trade items")
         self._tap((1060, 390))  # Trade button
         time.sleep(0.5)
         self._tap((700, 380))  # Equip tab

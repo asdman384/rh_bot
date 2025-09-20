@@ -64,7 +64,7 @@ def find_tpl(
         cv2.putText(
             out,
             f"score={best['score']:.2f}, scale={best['scale']:.2f}",
-            (max(0, x - 20), max(0, y - 10)),
+            (max(0, x - 20), max(20, y - 10)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (0, 235, 0),
