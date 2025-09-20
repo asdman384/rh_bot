@@ -1,12 +1,18 @@
 import asyncio
 import io
 import logging
-from typing import Optional
+from typing import Optional, List
 
 import cv2
 import numpy as np
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram import InlineKeyboardMarkup, Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 # Настройка логирования
 logging.basicConfig(
@@ -23,8 +29,11 @@ class TelegramBot:
         "/help - показать справку\n\n",
     ]
 
-    def __init__(self, token: str):
+    keyboard = InlineKeyboardMarkup([])
+
+    def __init__(self, token: str, admin_users: List[int] = None):
         self.token = token
+        self.admin_users = admin_users or []
         self.application = Application.builder().token(token).build()
         self._setup_handlers()
 
@@ -33,8 +42,18 @@ class TelegramBot:
         self.add_command_handler("help", self.start_command)
         self.add_command_handler("ping", self.ping_command)
 
+        # Add text message handler
+        self.application.add_handler(
+            MessageHandler(filters.TEXT & ~filters.COMMAND, self.echo_handler)
+        )
+
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("".join(self.welcome_message))
+
+    async def echo_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик текстовых сообщений (эхо)"""
+        user_text = update.message.text
+        await update.message.reply_text(f"🔊 Эхо: {user_text}")
 
     async def send_screenshot(
         self, image: np.ndarray, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -93,6 +112,23 @@ class TelegramBot:
     def add_command_handler(self, command: str, handler_func):
         self.application.add_handler(CommandHandler(command, handler_func))
         logger.info(f"Добавлен обработчик для команды: /{command}")
+
+    async def notify_admins(self, message: str):
+        """Отправляет сообщение всем администраторам из конфига"""
+        if not self.admin_users:
+            logger.warning("Список администраторов пуст")
+            return
+
+        for admin_id in self.admin_users:
+            try:
+                await self.application.bot.send_message(
+                    chat_id=admin_id, text=f"🔔 Уведомление администратору:\n{message}"
+                )
+                logger.info(f"Сообщение отправлено администратору {admin_id}")
+            except Exception as e:
+                logger.error(
+                    f"Ошибка отправки сообщения администратору {admin_id}: {e}"
+                )
 
     async def run(self):
         """Запуск бота"""

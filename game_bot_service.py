@@ -3,8 +3,8 @@ import time
 from threading import Thread
 from typing import Optional
 
-from telegram import Update
-from telegram.ext import ContextTypes
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import CallbackQueryHandler, ContextTypes
 
 from bot import start_game_bot
 from devices.device import Device
@@ -16,8 +16,13 @@ from tg.telegram_bot import TelegramBot
 class GameBotService:
     """Сервис для интеграции бота с захватом скриншотов"""
 
-    def __init__(self, bot_token: str, window_title: str = "Rogue Hearts"):
-        self.bot = TelegramBot(bot_token)
+    def __init__(
+        self,
+        bot_token: str,
+        admin_users: list = None,
+        window_title: str = "Rogue Hearts",
+    ):
+        self.bot = TelegramBot(bot_token, admin_users)
         self.window_title = window_title
         self.hwnd = None
         self.screenshot_thread = None
@@ -145,6 +150,8 @@ class GameBotService:
             start_game_bot()
         except Exception as e:
             print(f"Ошибка в потоке game-бота: {e}")
+            # C:\dev\python\game_bot_service.py:216: RuntimeWarning: coroutine 'TelegramBot.notify_admins' was never awaited
+            asyncio.run(self.bot.notify_admins(f"Ошибка в потоке game-бота: {e}"))
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Запуск сервиса"""
@@ -201,8 +208,10 @@ class GameBotService:
 async def main():
     """Основная функция"""
     config = BotConfig()
+
     await GameBotService(
         config.get("telegram.bot_token"),
+        config.get("telegram.admin_users", []),
         config.get("screenshot.window_title"),
     ).bot.run()
 
