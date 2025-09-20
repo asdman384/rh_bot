@@ -55,17 +55,12 @@ def mouse_callback(event, x, y, flags, param):
 
 
 device = Device("127.0.0.1", 58526)
-device.connect()
 
 frame = device.get_frame2()
-
-for _ in range(156):
-    device.click((557, 370))
-    time.sleep(0.05)
-
 cv2.imshow("frame", frame)
 cv2.setMouseCallback("frame", mouse_callback)
 cv2.waitKey(0)
+device.close()
 
 # i = 0
 # while 1:
@@ -74,3 +69,8 @@ cv2.waitKey(0)
 #     cv2.imshow("frame", frame)
 #     cv2.imwrite(f"images/{i}.png", frame)
 #     cv2.waitKey(0)
+
+
+# for _ in range(156):
+#     device.click((557, 370))
+#     time.sleep(0.05)

@@ -3,7 +3,7 @@ import time
 import cv2
 import numpy as np
 
-from boss import Boss, BossBhalor, BossDain, BossElvira, BossKhanel, BossMine
+from boss.boss import Boss
 from bot_utils.drafts import print_pixels_array
 from controller import Controller
 from count_enemies import count_enemies
@@ -409,18 +409,21 @@ class MazeRH:
 
 
 if __name__ == "__main__":
+    from boss import BossDelingh
+
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
-    boss = BossMine(controller, True)
+    boss = BossDelingh(controller, True)
     maze = MazeRH(controller, boss, True)
 
     # # TEST is_near_exit
     while 1:
-        frame830x690 = extract_game(maze.get_frame())
-        frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
-        res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
-        print(res, _)
+        maze.sense()
+        # frame830x690 = extract_game(maze.get_frame())
+        # frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
+        # res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
+        # print(res, _)
 
     # # TEST is_near_exit thresolds
     # frame = extract_game(device.get_frame2())

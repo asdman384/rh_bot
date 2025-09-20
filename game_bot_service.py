@@ -2,12 +2,13 @@ import asyncio
 import time
 from threading import Thread
 
+from devices.device import Device
 from devices.wincap import find_window_by_title, screenshot_window_np
 from tg.bot_config import BotConfig
 from tg.telegram_bot import TelegramBot
 
 
-class ScreenshotBotService:
+class GameBotService:
     """Сервис для интеграции бота с захватом скриншотов"""
 
     def __init__(self, bot_token: str, window_title: str = "Rogue Hearts"):
@@ -18,8 +19,22 @@ class ScreenshotBotService:
         self.screenshot_thread = None
 
         # Добавляем дополнительные команды
-        self.bot.add_command_handler("live", self._live_screenshot_command)
+        self.bot.add_command_handler("screenshot", self._live_screenshot_command)
         self.bot.add_command_handler("window", self._window_info_command)
+        self.bot.add_command_handler("close", self._close_window_command)
+
+    async def _close_window_command(self, update, context):
+        """Команда для закрытия окна"""
+        try:
+            device = Device("127.0.0.1", 58526)
+            device.connect()
+            device.force_stop_rogue_hearts()
+            device.close()
+
+            await update.message.reply_text(f"🪟 Окно '{self.window_title}' закрыто")
+
+        except Exception as e:
+            await update.message.reply_text(f"❌ Ошибка: {str(e)}")
 
     async def _live_screenshot_command(self, update, context):
         """Команда для получения живого скриншота"""
@@ -41,6 +56,7 @@ class ScreenshotBotService:
     async def _window_info_command(self, update, context):
         """Информация о целевом окне"""
         try:
+            self._find_window()
             if self.hwnd:
                 message = f"🪟 Окно найдено: {self.window_title}\nHWND: {self.hwnd}"
             else:
@@ -62,10 +78,10 @@ class ScreenshotBotService:
             self.hwnd = None
             return False
 
-    def _screenshot_worker(self):
+    def _game_bot_worker(self):
         """Рабочий поток для периодического обновления скриншотов"""
         last_update = 0
-        update_interval = 5.0  # Обновляем каждые 5 секунд
+        update_interval = 500.0  # Обновляем каждые 5 секунд
 
         while self.running:
             try:
@@ -81,19 +97,19 @@ class ScreenshotBotService:
                 time.sleep(1)  # Проверяем каждую секунду
 
             except Exception as e:
-                print(f"Ошибка в потоке скриншотов: {e}")
+                print(f"Ошибка в потоке game-бота: {e}")
                 time.sleep(5)  # Ждем дольше при ошибке
 
     async def start(self):
         """Запуск сервиса"""
-        print("🚀 Запуск сервиса скриншот-бота...")
+        print("🚀 Запуск сервиса game-бота...")
 
         # Ищем окно
         self._find_window()
 
         # Запускаем поток для скриншотов
         self.running = True
-        self.screenshot_thread = Thread(target=self._screenshot_worker, daemon=True)
+        self.screenshot_thread = Thread(target=self._game_bot_worker, daemon=True)
         self.screenshot_thread.start()
 
         # Запускаем бота
@@ -101,7 +117,7 @@ class ScreenshotBotService:
 
     def stop(self):
         """Остановка сервиса"""
-        print("⏹️ Остановка сервиса...")
+        print("⏹️ Остановка сервиса game-бота...")
         self.running = False
         if self.screenshot_thread:
             self.screenshot_thread.join(timeout=5)
@@ -111,7 +127,7 @@ class ScreenshotBotService:
 async def main():
     """Основная функция"""
     config = BotConfig()
-    service = ScreenshotBotService(
+    service = GameBotService(
         config.get("telegram.bot_token"),
         config.get("screenshot.window_title"),
     )

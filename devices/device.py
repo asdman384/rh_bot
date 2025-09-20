@@ -1,12 +1,19 @@
 from typing import Optional
 import os
 import logging
-import numpy as np
+import subprocess
 
 from adb_shell.adb_device import AdbDeviceTcp
 from adb_shell.auth.sign_pythonrsa import PythonRSASigner
 
-from devices.wincap import click_in_window, find_window_by_title, screenshot_window_np
+try:
+    from devices.wincap import (
+        click_in_window,
+        find_window_by_title,
+        screenshot_window_np,
+    )
+except ImportError:
+    from wincap import click_in_window, find_window_by_title, screenshot_window_np
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +29,7 @@ class Device:
     Example:
         with Device() as d:
             adb = d.device
+        # device.device.shell("pm list packages | grep -i rogue")
     """
 
     def __init__(
@@ -85,6 +93,7 @@ class Device:
 
         self.device = device
         logger.debug("Connected to device at %s:%s", self.host, self.port)
+        self._hwnd = find_window_by_title("Rogue Hearts")
         return self
 
     def close(self) -> None:
@@ -106,7 +115,51 @@ class Device:
         # don't suppress exceptions
         return False
 
+    def force_stop_app(self, package_name: str) -> str:
+        """Force stop an application by package name."""
+        if self.device is None:
+            raise ConnectionError("Device not connected")
+        return self.device.shell(f"am force-stop {package_name}")
+
+    def force_stop_rogue_hearts(self) -> str:
+        """Force stop Rogue Hearts game."""
+        package_name = "com.ninetailgames.roguehearts.paid"
+        return self.force_stop_app(package_name)
+
+    def start_app(self, package_name: str) -> str:
+        """Start an application by package name."""
+        if self.device is None:
+            raise ConnectionError("Device not connected")
+        return self.device.shell(
+            f"monkey -p {package_name} -c android.intent.category.LAUNCHER 1"
+        )
+
+    def start_rogue_hearts(self) -> str:
+        """Start Rogue Hearts game."""
+        package_name = "com.ninetailgames.roguehearts.paid"
+        return self.start_app(package_name)
+
+    def start_rogue_hearts_wsa(self) -> str:
+        """Start Rogue Hearts game using Windows Subsystem for Android."""
+        wsa_client_path = os.path.expanduser(
+            r"~\AppData\Local\Microsoft\WindowsApps\MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe\WsaClient.exe"
+        )
+        package_name = "com.ninetailgames.roguehearts.paid"
+
+        try:
+            result = subprocess.run(
+                [wsa_client_path, "/launch", f"wsa://{package_name}"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Failed to start Rogue Hearts via WSA: {e.stderr}")
+        except FileNotFoundError:
+            raise FileNotFoundError(f"WSA Client not found at: {wsa_client_path}")
+
 
 if __name__ == "__main__":
     device = Device("127.0.0.1", 58526)
-    device.connect()
+    device.start_rogue_hearts_wsa()

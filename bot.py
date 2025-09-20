@@ -3,7 +3,7 @@ import winsound
 
 import cv2
 
-from boss import BossBhalor, BossDain, BossElvira, BossKhanel, BossMine
+from boss.boss import BossBhalor, BossDain, BossElvira, BossKhanel, BossMine
 from bot_utils.screenshoter import save_image
 from controller import Controller
 from detect_boss_room import wait_for_boss_popup
@@ -21,13 +21,16 @@ device = Device("127.0.0.1", 58526)
 device.connect()
 controller = Controller(device, DEBUG)
 # 💀 💀 💀
-boss = BossDain(controller, DEBUG)
+boss = BossBhalor(controller, DEBUG)
 maze = MazeRH(controller, boss, DEBUG)
 explorer = Explorer(maze)
 
 # ---------------------- Main loop --------------------------
 run = 1
-if __name__ == "__main__":
+
+
+def main():
+    global run
     try:
         while run < 45:
             t0 = time.time()
@@ -133,3 +136,7 @@ if __name__ == "__main__":
         device.close()
         winsound.Beep(2000, 300)
         print("Finished.")
+
+
+if __name__ == "__main__":
+    main()

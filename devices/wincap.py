@@ -1,6 +1,5 @@
 from ctypes import windll
 
-import cv2
 import numpy as np
 import win32gui
 import win32ui
@@ -28,7 +27,7 @@ def find_window_by_title(substring: str) -> int:
 
     win32gui.EnumWindows(enum_handler, None)
     if not matches:
-        raise RuntimeError(f"Окно с заголовком, содержащим '{substring}', не найдено.")
+        raise RuntimeError(f"Окно '{substring}', не найдено.")
     return sorted(matches, reverse=True)[0][1]
 
 
@@ -188,36 +187,3 @@ def click_in_window(hwnd, x, y, button="left", double=False, route_to_child=True
     else:
         win32gui.SendMessage(target, DOWN, MK, lp)
         win32gui.SendMessage(target, UP, 0, lp)
-
-
-# if __name__ == "__main__":
-#     hwnd = find_window_by_title("Блокнот")  # или "Notepad"
-#     # Кликнем в точку (50, 50) клиентской области
-#     click_in_window(hwnd, 50, 50, button="left", double=False)
-
-
-if __name__ == "__main__":
-    import time
-
-    def limit_fps(last_time: float, max_fps: float) -> float:
-        """Ограничить FPS простым сном; вернуть новый last_time."""
-        if max_fps <= 0:
-            return time.time()
-        min_interval = 1.0 / max_fps
-        now = time.time()
-        dt = now - last_time
-        if dt < min_interval:
-            time.sleep(min_interval - dt)
-            now = time.time()
-        return now
-
-    hwnd = find_window_by_title("Rogue Hearts")  # или часть названия: "Notepad"
-    last = 0.0
-    # while True:
-    if True:
-        last = limit_fps(last, 30)
-        frame_bgr = screenshot_window_np(
-            hwnd, client_only=False
-        )  # np.ndarray (H,W,3) BGR
-        cv2.imwrite("notepad.png", frame_bgr)
-        cv2.waitKey(1)

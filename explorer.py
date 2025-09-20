@@ -4,7 +4,7 @@ from typing import Deque, Dict, List, Optional, Tuple
 
 import cv2
 
-from boss import BossDain, BossBhalor
+from boss.boss import BossDain, BossBhalor
 from map_memory import MapMemory, draw_map_memory
 from maze_rh import MazeRH
 from model import ALL_DIRS, Direction, Pos
@@ -264,7 +264,7 @@ class Explorer:
 
 
 if __name__ == "__main__":
-    from boss import BossDain, BossMine
+    from boss.boss import BossDain, BossMine
     from controller import Controller
     from devices.device import Device
 
