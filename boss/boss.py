@@ -230,7 +230,7 @@ class Boss(ABC):
         X, Y, X2, Y2 = self.exit_sw_tpl_roi
         frame = cv2.resize(bgr[Y:Y2, X:X2], (X2 - X, Y2 - Y))
         box, score = find_tpl(
-            frame, self.exit_tpl_sw, [1.0], score_threshold=0.77, debug=self.debug
+            frame, self.exit_tpl_sw, [1.0], score_threshold=0.74, debug=self.debug
         )
         if box is not None:
             return True, Direction.SW

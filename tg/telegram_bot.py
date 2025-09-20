@@ -16,59 +16,37 @@ logger = logging.getLogger(__name__)
 
 
 class TelegramBot:
+    welcome_message = [
+        "Доступные команды:\n",
+        "/start - приветствие и список команд\n",
+        "/ping - проверить связь с ботом\n",
+        "/help - показать справку\n\n",
+    ]
+
     def __init__(self, token: str):
         self.token = token
         self.application = Application.builder().token(token).build()
-        self.current_image: Optional[np.ndarray] = None
         self._setup_handlers()
 
     def _setup_handlers(self):
-        """Настройка обработчиков команд"""
-        # Основные команды
-        self.application.add_handler(CommandHandler("start", self.start_command))
-        self.application.add_handler(CommandHandler("help", self.help_command))
-
-        # Команды для будущего расширения
-        self.application.add_handler(CommandHandler("status", self.status_command))
-        self.application.add_handler(CommandHandler("ping", self.ping_command))
+        self.add_command_handler("start", self.start_command)
+        self.add_command_handler("help", self.start_command)
+        self.add_command_handler("ping", self.ping_command)
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /start"""
-        welcome_message = (
-            "Доступные команды:\n"
-            "/help - показать справку\n"
-            "/screenshot - получить текущий скриншот\n"
-            "/status - показать статус бота\n"
-            "/window - показать информацию о целевом окне\n"
-            "/close - закрыть целевое окно\n"
-            "/ping - проверить связь с ботом"
-        )
-        await update.message.reply_text(welcome_message)
+        await update.message.reply_text("".join(self.welcome_message))
 
-    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /help"""
-        help_message = (
-            "/start - приветствие и список команд\n"
-            "/help - эта справка\n"
-            "/screenshot - отправить текущий скриншот\n"
-            "/status - показать статус системы\n"
-            "/window - показать информацию о целевом окне\n"
-            "/close - закрыть целевое окно\n"
-            "/ping - проверить отклик бота"
-        )
-        await update.message.reply_text(help_message)
-
-    async def screenshot_command(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    async def send_screenshot(
+        self, image: np.ndarray, update: Update, context: ContextTypes.DEFAULT_TYPE
     ):
         """Обработчик команды /screenshot"""
         try:
-            if self.current_image is None:
+            if image is None:
                 await update.message.reply_text("❌ Нет доступного скриншота")
                 return
 
             # Конвертируем np.ndarray в изображение для отправки
-            image_bytes = self._convert_np_to_bytes(self.current_image)
+            image_bytes = self._convert_np_to_bytes(image)
 
             if image_bytes is None:
                 await update.message.reply_text("❌ Ошибка при обработке изображения")
@@ -82,16 +60,6 @@ class TelegramBot:
         except Exception as e:
             logger.error(f"Ошибка при отправке скриншота: {e}")
             await update.message.reply_text(f"❌ Ошибка: {str(e)}")
-
-    async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /status"""
-        status_message = (
-            "📊 Статус бота:\n\n"
-            f"✅ Бот активен\n"
-            f"📷 Скриншот: {'Доступен' if self.current_image is not None else 'Недоступен'}\n"
-            f"🔄 Обновлений: {len(self.application.handlers[0])}"
-        )
-        await update.message.reply_text(status_message)
 
     async def ping_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /ping"""
@@ -122,13 +90,7 @@ class TelegramBot:
             logger.error(f"Ошибка при конвертации изображения: {e}")
             return None
 
-    def update_image(self, image: np.ndarray):
-        """Обновляет текущее изображение"""
-        self.current_image = image.copy()
-        logger.info("Изображение обновлено")
-
     def add_command_handler(self, command: str, handler_func):
-        """Добавляет новый обработчик команды (для будущего расширения)"""
         self.application.add_handler(CommandHandler(command, handler_func))
         logger.info(f"Добавлен обработчик для команды: /{command}")
 

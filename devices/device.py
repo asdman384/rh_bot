@@ -139,7 +139,8 @@ class Device:
         package_name = "com.ninetailgames.roguehearts.paid"
         return self.start_app(package_name)
 
-    def start_rogue_hearts_wsa(self) -> str:
+    @staticmethod
+    def start_rogue_hearts_wsa() -> str:
         """Start Rogue Hearts game using Windows Subsystem for Android."""
         wsa_client_path = os.path.expanduser(
             r"~\AppData\Local\Microsoft\WindowsApps\MicrosoftCorporationII.WindowsSubsystemForAndroid_8wekyb3d8bbwe\WsaClient.exe"

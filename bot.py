@@ -16,21 +16,22 @@ from model import Direction
 
 DEBUG = False
 
-# ---------------------- ADB & control ----------------------
-device = Device("127.0.0.1", 58526)
-device.connect()
-controller = Controller(device, DEBUG)
-# 💀 💀 💀
-boss = BossDelingh(controller, DEBUG)
-maze = MazeRH(controller, boss, DEBUG)
-explorer = Explorer(maze)
 
-# ---------------------- Main loop --------------------------
 run = 1
 
 
-def main():
+def start_game_bot():
     global run
+    # ---------------------- ADB & control ----------------------
+    device = Device("127.0.0.1", 58526)
+    device.connect()
+    controller = Controller(device, DEBUG)
+    # 💀 💀 💀
+    boss = BossDelingh(controller, True)
+    maze = MazeRH(controller, boss, DEBUG)
+    explorer = Explorer(maze)
+
+    # ---------------------- Main loop --------------------------
     try:
         while run < 45:
             t0 = time.time()
@@ -105,7 +106,7 @@ def main():
                 )
                 or hp != 0
             ):
-                print("figth_end not found")
+                print("⚠️ figth_end not found")
                 winsound.Beep(5000, 300)
                 time.sleep(60)
 
@@ -115,7 +116,7 @@ def main():
 
             # open chest
             if not boss.open_chest(dir) and type(boss) is BossDain:
-                print("open chest fail")
+                print("⚠️ open chest fail")
                 cv2.waitKey(0)
                 time.sleep(5)
 
@@ -137,4 +138,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    start_game_bot()
