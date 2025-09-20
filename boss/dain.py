@@ -5,7 +5,7 @@ import cv2
 from boss.boss import Boss
 from controller import Controller
 from db import FA_KHANEL
-from detect_location import find_tpl, wait_for
+from detect_location import wait_for
 from model import Direction
 
 

@@ -3,11 +3,11 @@ import winsound
 
 import cv2
 
-from boss.boss import BossBhalor, BossDain, BossElvira, BossKhanel, BossMine
+from boss import BossDelingh, BossMine, BossDain
 from bot_utils.screenshoter import save_image
 from controller import Controller
 from detect_boss_room import wait_for_boss_popup
-from detect_location import find_tpl, wait_for, wait_loading
+from detect_location import find_tpl, wait_for
 from devices.device import Device
 from explorer import Explorer
 from frames import extract_game
@@ -21,7 +21,7 @@ device = Device("127.0.0.1", 58526)
 device.connect()
 controller = Controller(device, DEBUG)
 # 💀 💀 💀
-boss = BossBhalor(controller, DEBUG)
+boss = BossDelingh(controller, DEBUG)
 maze = MazeRH(controller, boss, DEBUG)
 explorer = Explorer(maze)
 
@@ -94,9 +94,7 @@ def main():
             time.sleep(0.1)
 
             # fight boss
-            boss.debug = True
             hp = boss.start_fight(dir)
-            boss.debug = False
 
             # close summary
             if (

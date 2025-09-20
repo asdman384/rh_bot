@@ -2,14 +2,10 @@ import time
 from collections import deque
 from typing import Deque, Dict, List, Optional, Tuple
 
-import cv2
-
-from boss.boss import BossDain, BossBhalor
-from map_memory import MapMemory, draw_map_memory
+from boss import BossDain, BossBhalor
+from map_memory import MapMemory
 from maze_rh import MazeRH
 from model import ALL_DIRS, Direction, Pos
-
-# === Планировщик ходов ========================================================
 
 
 def direction_priority(base: Optional[Direction]) -> List[Direction]:

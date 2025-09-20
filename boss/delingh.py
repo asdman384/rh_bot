@@ -4,65 +4,49 @@ import cv2
 
 from boss.boss import Boss
 from controller import Controller
-from db import FA_BHALOR, FA_KHANEL
-from detect_location import find_tpl
+from db import FA_BHALOR
 from model import Direction
 
 
 class BossDelingh(Boss):
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
-        self._dist_thresh_px = 350
-        self.max_moves = 100
+        self.max_moves = 150
         self.fa_dir_cells = FA_BHALOR
-        self.exit_door_area_threshold = 1600
         self.enter_room_clicks = 10
-        self.use_slide = False
+        self.use_slide = True
         self.fa_dir_threshold = {
-            "ne": 11,
-            "nw": 11,
-            "se": 11,
-            "sw": 11,
+            "ne": 30,
+            "nw": 30,
+            "se": 30,
+            "sw": 30,
         }
+        self.exit_check_type = "tpl"  # 'mask' | 'tpl'
+        self.exit_tpl_sw = cv2.imread("resources/delingh/exit_sw.png")
+        self.exit_tpl_ne = cv2.imread("resources/delingh/exit_ne.png")
 
     def start_fight(self, dir: Direction) -> int:
-        if dir == Direction.NE:
-            self.controller.move_NE()
-            time.sleep(0.4)
-
+        print("Fighting boss Delingh...") if self.debug else None
         self.controller.skill_3(
             (540, 360) if dir == Direction.SW else (640, 290)
         )  # slide
         time.sleep(2)
+
+        ne_routine = [self._attk_barrage, lambda: self._attk_focus_arrow((860, 260))]
+        sw_routine = [self._attk_barrage, lambda: self._attk_focus_arrow((530, 510))]
+        routine = ne_routine if dir == Direction.NE else sw_routine
         hp = 100
+        while hp > 0 and len(routine) > 0:
+            hp = routine.pop()()
 
-        if dir == Direction.NE:
-            hp = self._attk_focus_arrow((820, 290))  # focus arrow
-
-            if hp != 0:
-                hp = self._attk_barrage((690, 320))  # barrage
-                time.sleep(0.3)
-
-            if hp != 0:
-                hp = self._attk_barrage()  # greanade
-
-        elif dir == Direction.SW:
-            hp = self._attk_focus_arrow((530, 510))  # focus arrow
-
-            if hp != 0:
-                hp = self._attk_barrage((590, 390))  # barrage
-                time.sleep(0.3)
-
-            if hp != 0:
-                hp = self._attk_barrage()  # greanade
-
+        print("Finished boss Delingh...") if self.debug else None
         return hp
 
     def open_chest(self, dir: Direction) -> bool:
         self.controller.move_SW() if dir == Direction.SW else self.controller.move_NE()
-        time.sleep(0.5)
+        time.sleep(0.2)
         self.controller.skill_4()
-        time.sleep(2.6)
+        time.sleep(2.7)
         self.controller.move_S() if dir == Direction.SW else self.controller.move_E()
         time.sleep(0.5)
         return True
@@ -73,15 +57,4 @@ class BossDelingh(Boss):
 
     def fix_disaster(self):
         time.sleep(0.5)  # wait for any animation to finish
-        exit_ban = cv2.imread("resources/elvira_exit_ban.png", cv2.IMREAD_COLOR)
-        exit_ban_box, _ = find_tpl(
-            self._get_frame(), exit_ban, score_threshold=0.9, debug=self.debug
-        )
-        if exit_ban_box is not None:
-            self.controller.back()  # close banner
-            time.sleep(0.2)
-            self.controller.move_SE()
-            time.sleep(0.15)
-            return
-
         time.sleep(1.5)  # wait for any animation to finish
