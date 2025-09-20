@@ -27,7 +27,7 @@ def start_game_bot():
     device.connect()
     controller = Controller(device, DEBUG)
     # 💀 💀 💀
-    boss = BossDelingh(controller, True)
+    boss = BossDain(controller, DEBUG)
     maze = MazeRH(controller, boss, DEBUG)
     explorer = Explorer(maze)
 

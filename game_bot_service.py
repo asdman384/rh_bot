@@ -1,12 +1,17 @@
 import asyncio
 import time
+import sys
+from contextlib import redirect_stderr, redirect_stdout
+
 from threading import Thread
 from typing import Optional
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CallbackQueryHandler, ContextTypes
+from telegram import Update
+from telegram.ext import ContextTypes
+from collections import deque
 
 from bot import start_game_bot
+from bot_utils.tee_io import _TeeIO
 from devices.device import Device
 from devices.wincap import click_in_window, find_window_by_title, screenshot_window_np
 from tg.bot_config import BotConfig
@@ -26,6 +31,10 @@ class GameBotService:
         self.window_title = window_title
         self.hwnd = None
         self.screenshot_thread = None
+        # Rolling log storage for worker thread output
+        self._log_lines: deque[str] = deque(maxlen=2000)
+        self._stdout_tee: _TeeIO | None = None
+        self._stderr_tee: _TeeIO | None = None
 
         # Добавляем дополнительные команды
         self.bot.add_command_handler("screenshot", self._screenshot_command)
@@ -36,19 +45,21 @@ class GameBotService:
         self.bot.add_command_handler("start_game_bot", self.start)
         self.bot.add_command_handler("stop_game_bot", self.stop)
         self.bot.add_command_handler("click", self.click)
+        self.bot.add_command_handler("logs", self.logs_command)
         # Зарегистрировать список команд для меню Telegram
         self.bot.set_command_list(
             [
-                ("screenshot", "Отправить скриншот окна"),
-                ("window", "Информация об окне"),
-                ("start_game", "Запустить игру"),
-                ("click", "Клик по координатам /click x y"),
-                ("start_game_bot", "Запустить игровой бот"),
-                ("close_game", "Закрыть игру"),
-                ("help", "Справка по командам"),
-                ("ping", "Проверить связь"),
-                ("status", "Статус сервиса"),
-                ("stop_game_bot", "Остановить игровой бот (don't work)"),
+                ("screenshot", "📷 Отправить скриншот окна"),
+                ("window", "🗔 Информация об окне"),
+                ("start_game", "🗡️ Запустить игру"),
+                ("click", "🖱️ Клик по координатам /click x y"),
+                ("start_game_bot", "🤖 Запустить игровой бот"),
+                ("status", "📊 Статус сервиса"),
+                ("close_game", "❌ Закрыть игру"),
+                ("help", "ℹ️ Справка по командам"),
+                ("ping", "📶 Проверить связь"),
+                ("stop_game_bot", "🛑 Остановить игровой бот (don't work)"),
+                ("logs", "📝 Последние строки лога /logs [N=30]"),
             ]
         )
         self.bot.welcome_message.append("/screenshot - получить текущий скриншот\n\n")
@@ -61,6 +72,9 @@ class GameBotService:
             "/stop_game_bot - остановить игровой бот (don't work)\n\n"
         )
         self.bot.welcome_message.append("/click x y - кликнуть в координаты (x,y)\n\n")
+        self.bot.welcome_message.append(
+            "/logs [N] - последние N строк лога (по умолчанию 30)\n\n"
+        )
 
     async def click(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /click x y"""
@@ -162,11 +176,57 @@ class GameBotService:
         """Рабочий поток для периодического обновления скриншотов"""
 
         try:
-            start_game_bot()
+            # Prepare tee outputs so we don't lose console logs
+            if self._stdout_tee is None:
+                self._stdout_tee = _TeeIO(self._log_lines, sys.__stdout__)
+            if self._stderr_tee is None:
+                self._stderr_tee = _TeeIO(self._log_lines, sys.__stderr__, label="ERR ")
+
+            # Redirect only within this thread's execution block.
+            # Note: sys.stdout is process-wide; during this block, other threads' prints
+            # will also be captured and still forwarded to the real console.
+            with redirect_stdout(self._stdout_tee), redirect_stderr(self._stderr_tee):
+                start_game_bot()
         except Exception as e:
             print(f"Ошибка в потоке game-бота: {e}")
             # C:\dev\python\game_bot_service.py:216: RuntimeWarning: coroutine 'TelegramBot.notify_admins' was never awaited
             asyncio.run(self.bot.notify_admins(f"Ошибка в потоке game-бота: {e}"))
+
+    async def logs_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Отправить последние N строк лога (stdout/stderr). По умолчанию N=30."""
+        try:
+            n = 30
+            if context.args and len(context.args) >= 1:
+                try:
+                    n = max(1, min(500, int(context.args[0])))
+                except ValueError:
+                    pass
+
+            if not self._log_lines:
+                await update.message.reply_text("ℹ️ Лог пуст.")
+                return
+
+            lines = list(self._log_lines)[-n:]
+            text = "\n".join(lines).strip()
+            # Telegram имеет лимит 4096 символов на сообщение.
+            if len(text) <= 4000:
+                await update.message.reply_text(
+                    f"📝 Последние {len(lines)} строк:\n\n{text}"
+                )
+            else:
+                # Отправим усечённую версию, чтобы не спамить множество сообщений
+                clipped = text[-3800:]
+                await update.message.reply_text(
+                    f"📝 Последние {len(lines)} строк (усечено):\n\n…{clipped}"
+                )
+        except Exception as e:
+            await update.message.reply_text(f"❌ Ошибка: {e}")
+
+    # Программный доступ к последним строкам лога
+    def get_last_logs(self, n: int = 30) -> str:
+        n = max(1, min(2000, int(n)))
+        lines = list(self._log_lines)[-n:]
+        return "\n".join(lines).strip()
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Запуск сервиса"""
