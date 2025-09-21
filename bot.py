@@ -3,7 +3,7 @@ import winsound
 
 import cv2
 
-from boss import BossDelingh, BossMine, BossDain
+from boss import BossDelingh, BossMine, BossDain, BossKhanel
 from bot_utils.screenshoter import save_image
 from controller import Controller
 from detect_boss_room import wait_for_boss_popup
@@ -27,7 +27,7 @@ def start_game_bot():
     device.connect()
     controller = Controller(device, DEBUG)
     # 💀 💀 💀
-    boss = BossDain(controller, DEBUG)
+    boss = BossKhanel(controller, DEBUG)
     maze = MazeRH(controller, boss, DEBUG)
     explorer = Explorer(maze)
 
@@ -52,7 +52,7 @@ def start_game_bot():
 
             if type(boss) is not BossMine and run % 40 == 0:  # every N run
                 boss.back()
-                controller.flush_bag(decompose=False)
+                controller.flush_bag(decompose=True)
                 run = 1
                 continue
 
@@ -130,7 +130,6 @@ def start_game_bot():
             run = run + 1
             boss.back()
     finally:
-        boss.back() if type(boss) is not BossMine else None
         cv2.destroyAllWindows()
         device.close()
         winsound.Beep(2000, 300)

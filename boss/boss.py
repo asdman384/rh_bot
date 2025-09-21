@@ -108,6 +108,7 @@ class Boss(ABC):
         self.controller = controller
         self.debug = debug
         self.minimap_sense = False
+        self.ensure_movement = True
         self._dist_thresh_px = 300
         self.max_moves = 500
         self.exit_door_area_threshold = 3000

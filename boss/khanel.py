@@ -25,12 +25,13 @@ class BossKhanel(Boss):
         self.max_moves = 100
         self.fa_dir_cells = FA_KHANEL
         self.exit_door_area_threshold = 5900
+        self.ensure_movement = False
 
     def start_fight(self, dir: Direction) -> int:
         if dir is None:
             return 100
 
-        print("Fighting boss Khanel..." + dir.label)
+        print("Fighting boss Khanel..." + dir.label) if self.debug else None
         self.controller.skill_3(
             (590, 390) if dir == Direction.SW else (690, 320)
         )  # slide

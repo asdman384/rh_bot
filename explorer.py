@@ -168,8 +168,8 @@ class Explorer:
         return self.maze.can_move(d)
 
     def _move(self, d: Direction) -> bool:
-        isMoved, isSlided = self.maze.move(d)
-        multiplier = 2 if isSlided else 1
+        isMoved, hasSlid = self.maze.move(d)
+        multiplier = 2 if hasSlid else 1
         if isMoved:
             self.pos = (
                 self.pos[0] + d.dx * multiplier,

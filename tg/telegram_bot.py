@@ -16,7 +16,7 @@ from telegram.ext import (
 
 # Настройка логирования
 logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.WARNING
 )
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ class TelegramBot:
 
     def add_command_handler(self, command: str, handler_func):
         self.application.add_handler(CommandHandler(command, handler_func))
-        logger.info(f"Добавлен обработчик для команды: /{command}")
+        logger.warning(f"Добавлен обработчик для команды: /{command}")
 
     def set_command_list(self, commands: List[tuple[str, str]]):
         self._commands = [BotCommand(cmd, desc) for cmd, desc in commands]
@@ -137,7 +137,7 @@ class TelegramBot:
 
     async def run(self):
         """Запуск бота"""
-        logger.info("Запуск Telegram бота...")
+        logger.warning("Запуск Telegram бота...")
         await self.application.initialize()
         # Apply bot commands so Telegram shows menu button with pop-up suggestions
         if self._commands:
@@ -149,7 +149,7 @@ class TelegramBot:
             # Держим бота запущенным
             await asyncio.Future()  # run forever
         except KeyboardInterrupt:
-            logger.info("Получен сигнал остановки")
+            logger.warning("Получен сигнал остановки")
         finally:
             await self.application.updater.stop()
             await self.application.stop()

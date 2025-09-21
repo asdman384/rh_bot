@@ -63,7 +63,7 @@ class BossDain(Boss):
         self.controller.move_SW() if dir == Direction.SW else self.controller.move_NE()
         time.sleep(0.5)
         self.controller.skill_4()
-        time.sleep(2)
+        time.sleep(2.5)
         chest = f"resources/dain/{Direction.SW.label.lower()}_chest.png"
         if wait_for(chest, self._get_frame, 1, 0.68, self.debug):
             print("wait_for chest again?")

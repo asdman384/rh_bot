@@ -14,12 +14,12 @@ class BossDelingh(Boss):
         self.max_moves = 150
         self.fa_dir_cells = FA_BHALOR
         self.enter_room_clicks = 10
-        self.use_slide = True
+        self.use_slide = False
         self.fa_dir_threshold = {
-            "ne": 30,
-            "nw": 30,
-            "se": 30,
-            "sw": 30,
+            "ne": 20,
+            "nw": 20,
+            "se": 20,
+            "sw": 20,
         }
         self.exit_check_type = "tpl"  # 'mask' | 'tpl'
         self.exit_tpl_sw = cv2.imread("resources/delingh/exit_sw.png")

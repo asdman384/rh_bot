@@ -259,9 +259,9 @@ class MazeRH:
 
     def move(self, d: Direction) -> tuple[bool, bool]:
         """
-        return (moved, slided)
+        return (moved, slid)
         """
-        slided = False
+        slid = False
         self.moves += 2
         move = getattr(self.controller, f"move_{d.label}", None)
         if move is None:
@@ -270,7 +270,7 @@ class MazeRH:
         steps = 2 if self.boss.minimap_sense else 3
         for _ in range(steps):
             if self._enemies > 0:
-                slided = self._clear_enemies(self.boss.use_slide)
+                slid = self._clear_enemies(self.boss.use_slide)
             move()
 
             if not self.boss.minimap_sense and _ != 2:
@@ -280,14 +280,13 @@ class MazeRH:
                 self._is_exit = self.boss.is_near_exit(frame830x690hsv, frame830x690)
 
             if self._is_exit[0] and self._enemies == 0:
-                return True, slided
+                return True, slid
 
         if not self.boss.minimap_sense:
             time.sleep(0.15)
 
         newFrame = self.sense()
-        return self._is_moved(newFrame, d), slided
-        return not self.boss.minimap_sense or self._is_moved(newFrame, d), slided
+        return not self.boss.ensure_movement or self._is_moved(newFrame, d), slid
 
     def _is_moved(self, frame: cv2.typing.MatLike, d: Direction):
         # ttt = newFrame.copy()
@@ -310,11 +309,11 @@ class MazeRH:
         return diff
 
     def _clear_enemies(self, use_slide=True) -> bool:
-        slided = False
+        slid = False
         if (self.moves - self.last_combat > 3) and use_slide:
             time.sleep(0.2)
             self.controller.skill_3()  # slide
-            slided = True
+            slid = True
             self.last_combat = self.moves
 
         attacks_count = 0
@@ -325,7 +324,7 @@ class MazeRH:
         time.sleep(1)
         self.moves += 1
 
-        return slided
+        return slid
 
     def _count_enemies(
         self,
