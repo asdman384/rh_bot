@@ -14,7 +14,16 @@ from telegram.ext import (
     filters,
 )
 
-# Настройка логирования
+# Suppress noisy INFO logs from telegram and httpx libraries
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("telegram").setLevel(logging.WARNING)
+logging.getLogger("apscheduler").setLevel(logging.WARNING)
+logging.getLogger("apscheduler.scheduler").setLevel(logging.WARNING)
+logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
+logging.getLogger("apscheduler.jobstores.default").setLevel(logging.WARNING)
+logging.getLogger("apscheduler.job").setLevel(logging.WARNING)
+logging.getLogger("_client").setLevel(logging.WARNING)
+
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.WARNING
 )

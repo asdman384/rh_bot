@@ -17,7 +17,7 @@ def count_enemies(hsv: cv.typing.MatLike, show_debug=False) -> int:
     # Пороговые размеры
     min_h = 5
     max_h = 8
-    min_w = 20
+    min_w = 50
     max_w = 70
 
     candidates = []

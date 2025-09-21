@@ -15,6 +15,7 @@ class BossDain(Boss):
         self._dist_thresh_px = 350
         self.max_moves = 100
         self.fa_dir_cells = FA_KHANEL
+        self.ensure_movement = False
         self.exit_door_area_threshold = 300
         self.enter_room_clicks = 10
         self.no_combat_minions = True

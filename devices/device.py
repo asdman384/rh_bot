@@ -17,6 +17,8 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
+# Suppress logging from noisy modules
+logging.getLogger("adb_shell.adb_device").setLevel(logging.WARNING)
 
 
 class Device:

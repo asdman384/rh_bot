@@ -6,11 +6,11 @@ from contextlib import redirect_stderr, redirect_stdout
 from threading import Thread
 from typing import Optional
 
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes
 from collections import deque
 
-from bot import start_game_bot
+from bot import BotRunner
 from bot_utils.tee_io import _TeeIO
 from devices.device import Device
 from devices.wincap import click_in_window, find_window_by_title, screenshot_window_np
@@ -35,6 +35,8 @@ class GameBotService:
         self._log_lines: deque[str] = deque(maxlen=2000)
         self._stdout_tee: _TeeIO | None = None
         self._stderr_tee: _TeeIO | None = None
+        # Selected boss name passed via /start_game_bot argument
+        self._selected_boss: str | None = None
 
         # Добавляем дополнительные команды
         self.bot.add_command_handler("screenshot", self._screenshot_command)
@@ -173,6 +175,10 @@ class GameBotService:
             return False
 
     def _game_bot_worker(self):
+        if self._selected_boss is None:
+            print("❌ Босс не выбран, запуск пропущен.")
+            return
+
         try:
             # Prepare tee outputs so we don't lose console logs
             if self._stdout_tee is None:
@@ -184,7 +190,7 @@ class GameBotService:
             # Note: sys.stdout is process-wide; during this block, other threads' prints
             # will also be captured and still forwarded to the real console.
             with redirect_stdout(self._stdout_tee), redirect_stderr(self._stderr_tee):
-                start_game_bot()
+                BotRunner(self._selected_boss).go()
         except Exception as e:
             print(f"Ошибка в потоке game-бота: {e}")
             # C:\dev\python\game_bot_service.py:216: RuntimeWarning: coroutine 'TelegramBot.notify_admins' was never awaited
@@ -227,7 +233,43 @@ class GameBotService:
         return "\n".join(lines).strip()
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Запуск сервиса"""
+        """Запуск сервиса
+
+        Ожидает аргумент с названием босса: BossDain или BossBhalor.
+        Если аргумент не указан или неверен — показывает кнопки, которые отправят
+        ту же команду с нужным аргументом.
+        """
+        # Parse boss argument
+        boss_arg = None
+        if context.args and len(context.args) >= 1:
+            boss_arg = context.args[0]
+
+        valid_bosses = {
+            "dain",
+            "bhalor",
+            "khanel",
+            "delingh",
+            "elvira",
+        }
+
+        if not boss_arg or boss_arg not in valid_bosses:
+            # Show reply keyboard with command shortcuts
+            kb = ReplyKeyboardMarkup(
+                [
+                    ["/start_game_bot dain", "/start_game_bot bhalor"],
+                    ["/start_game_bot khanel", "/start_game_bot delingh"],
+                    ["/start_game_bot elvira"],
+                ],
+                resize_keyboard=True,
+            )
+            msg = "Выберите босса для запуска бота.\nНажмите кнопку ниже:"
+            await update.message.reply_text(msg, reply_markup=kb)
+            return
+
+        # Store selected boss for worker usage (если потребуется)
+        self._selected_boss = boss_arg
+
+        # Далее обычный запуск
         if self.screenshot_thread and self.screenshot_thread.is_alive():
             print("⚠️ Сервис уже запущен, повторный запуск пропущен.")
             await update.message.reply_text(

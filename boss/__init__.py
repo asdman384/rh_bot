@@ -4,6 +4,7 @@ from .bhalor import BossBhalor
 from .khanel import BossKhanel
 from .elvira import BossElvira
 from .mine import BossMine
+from .boss import Boss
 
 __all__ = [
     "Boss",

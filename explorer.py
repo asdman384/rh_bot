@@ -1,3 +1,4 @@
+import logging
 import time
 from collections import deque
 from typing import Deque, Dict, List, Optional, Tuple
@@ -6,6 +7,9 @@ from boss import BossDain, BossBhalor
 from map_memory import MapMemory
 from maze_rh import MazeRH
 from model import ALL_DIRS, Direction, Pos
+
+
+logger = logging.getLogger(__name__)
 
 
 def direction_priority(base: Optional[Direction]) -> List[Direction]:
@@ -74,7 +78,7 @@ class Explorer:
     ) -> Tuple[bool, int, Optional[Direction]]:
         """
         Выполняет пошаговый поиск выхода.
-        Возвращает (успех, число_шагов).
+        Возвращает (reason, число_шагов).
         """
         if restart:
             self._init()
@@ -101,14 +105,14 @@ class Explorer:
                     type(self.maze.boss) is BossBhalor
                     or type(self.maze.boss) is BossDain
                 ):
-                    return True, steps, exit[1]
+                    return "success", steps, exit[1]
                 # TODO: remove
                 # dir can be either SW or NE
                 if last_dir == Direction.NW:
                     last_dir = Direction.SW
                 elif last_dir == Direction.SE:
                     last_dir = Direction.NE
-                return True, steps, last_dir
+                return "success", steps, last_dir
 
             # Выбрать локальный ход (в ещё не посещённого соседа)
             last_dir = d = self._pick_local_step()
@@ -117,10 +121,12 @@ class Explorer:
             if d is None:
                 target = self._nearest_unvisited_open()
                 if target is None:
-                    # Всё исследовано, выхода нет в известной области
-                    if verbose:
-                        print("[END] No more targets; full explored region exhausted.")
-                    return False, steps, None
+                    logger.debug("[END] Full explored region exhausted.")
+                    return (
+                        "[END] Full explored region exhausted.",
+                        steps,
+                        None,
+                    )
                 if target != self.pos:
                     # Проложить путь к target (BFS) и сделать ПЕРВЫЙ шаг по нему
                     path = bfs_shortest_path(self.map, self.pos, target)
@@ -129,19 +135,21 @@ class Explorer:
                         # Попробуем локально "расшить" с помощью любого доступного открытого соседа
                         d = self._fallback_any_open_dir()
                         if d is None:
-                            if verbose:
-                                print(
-                                    "[END] Stuck: no path to target and no local open edges."
-                                )
-                            return False, steps, None
+                            logger.debug(
+                                "[END] Stuck: no path to target and no local open edges."
+                            )
+                            return (
+                                "[END] Stuck: no path to target and no local open edges.",
+                                steps,
+                                None,
+                            )
                     else:
                         next_pos = path[1]
                         d = self._dir_to(self.pos, next_pos)
 
             if d is None:
-                if verbose:
-                    print("[END] No move decided.")
-                return False, steps, None
+                logger.debug("[END] No move decided.")
+                return "[END] No move decided.", steps, None
 
             if self._move(d):
                 steps += 1
@@ -151,16 +159,16 @@ class Explorer:
                 # Не удалось сделать ход (ложное срабатывание can_move)
                 # Предыдущая позиция не меняется, prev_dir не меняется
                 self.map.mark_edge(self.pos, d, False)
-                if verbose:
-                    print(f"[WARN] Move {d.label} from {self.pos} failed unexpectedly.")
+                logger.debug(
+                    f"[WARN] Move {d.label} from {self.pos} failed unexpectedly."
+                )
 
             # img = draw_map_memory(self.map)
             # cv2.imshow("map", img)
             # cv2.waitKey(1)
 
-        if verbose:
-            print(f"[END] Step limit {max_steps} reached.")
-        return False, steps, None
+        logger.debug(f"[END] Step limit {max_steps} reached.")
+        return "[END] Step limit {max_steps} reached.", steps, None
 
     # --- Взаимодействие с API ---
 

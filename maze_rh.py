@@ -1,3 +1,4 @@
+import logging
 import time
 
 import cv2
@@ -20,6 +21,8 @@ LOWER_1 = np.array([94, 54, 115])
 UPPER_2 = np.array([108, 102, 181])
 
 THRESHOLD_BITS = 38
+
+logger = logging.getLogger(__name__)
 
 
 def put_labels(
@@ -397,7 +400,9 @@ class MazeRH:
 
         # Check if all directions are zero
         if all(not v for v in self._direction_dict.values()):
-            print("Warning: All direction possibilities are zero. Sensing again...")
+            logger.debug(
+                "Warning: All direction possibilities are zero. Sensing again..."
+            )
             self.boss.fix_disaster()
             decoded = self._get_frame_fa()
             frame830x690 = extract_game(decoded)

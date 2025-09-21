@@ -198,6 +198,4 @@ class Controller:
         self._tap((850, 490))  # OK button
         self.wait_loading(2)
 
-        self.full_back()
-
         return True

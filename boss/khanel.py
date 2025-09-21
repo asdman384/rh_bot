@@ -1,5 +1,7 @@
 import time
 
+import cv2
+
 from boss.boss import Boss, extract_boss_health, measure_fill_px
 from controller import Controller
 from db import FA_KHANEL
@@ -26,6 +28,9 @@ class BossKhanel(Boss):
         self.fa_dir_cells = FA_KHANEL
         self.exit_door_area_threshold = 5900
         self.ensure_movement = False
+        # self.exit_check_type = "tpl"  # 'mask' | 'tpl'
+        # self.exit_tpl_sw = cv2.imread("resources/khanel/exit_sw.png")
+        # self.exit_tpl_ne = cv2.imread("resources/khanel/exit_sw.png")
 
     def start_fight(self, dir: Direction) -> int:
         if dir is None:
