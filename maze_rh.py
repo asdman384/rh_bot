@@ -138,6 +138,23 @@ def player_mask(hsv: cv2.typing.MatLike, masks) -> cv2.typing.MatLike:
     return pm
 
 
+def draw_rect(frame, p_xy, prev_p_xy, offset):
+    for x, y in RECT:
+        if prev_p_xy is not None:
+            p_xy = (
+                prev_p_xy[0] if abs(prev_p_xy[0] - p_xy[0]) > 10 else p_xy[0],
+                prev_p_xy[1] if abs(prev_p_xy[1] - p_xy[1]) > 10 else p_xy[1],
+            )
+
+        rect_x = x + p_xy[0] + offset[0]
+        rect_y = y + p_xy[1] + offset[1]
+
+        if rect_y >= 300 or rect_x >= 350:
+            continue
+
+        frame[rect_y, rect_x] = (0, 0, 255)
+
+
 def check_rect(frame, p_xy, prev_p_xy, offset) -> float:
     white_count = 0
     for x, y in RECT:
@@ -180,7 +197,7 @@ def minimap_open_dirs(
     wall_m2 = cv2.inRange(hsv, masks["wall"]["l2"], masks["wall"]["u2"])
     lab = cv2.bitwise_or(path_m, cv2.bitwise_or(wall_m1, wall_m2))
 
-    offset = {"NE": (3, -10), "NW": (-13, -11), "SW": (-14, 2), "SE": (4, 1)}
+    offset = {"NE": (3, -12), "NW": (-13, -11), "SW": (-15, 1), "SE": (4, 1)}
 
     ne = 0
     nw = 0
@@ -195,12 +212,14 @@ def minimap_open_dirs(
         nw = check_rect(lab, p_xy, prev_p_xy, offset["NW"])
         se = check_rect(lab, p_xy, prev_p_xy, offset["SE"])
         sw = check_rect(lab, p_xy, prev_p_xy, offset["SW"])
-        cv2.circle(frame, p_xy, 2, (255, 255, 255), 2)
+        cv2.circle(frame, p_xy, 1, (255, 255, 255), 1)
 
     if p_xy is not None:
         prev_p_xy = p_xy
 
     if debug:
+        draw_rect(frame, p_xy, prev_p_xy, offset["NE"])
+        draw_rect(frame, p_xy, prev_p_xy, offset["SW"])
         cv2.imshow("minimap/frame", frame)
         cv2.imshow("minimap/pm", pm)
         cv2.putText(
@@ -281,12 +300,13 @@ class MazeRH:
                 frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
                 self._enemies = self._count_enemies(frame830x690hsv, frame830x690)
                 self._is_exit = self.boss.is_near_exit(frame830x690hsv, frame830x690)
+            else:
+                time.sleep(0.03)
 
             if self._is_exit[0] and self._enemies == 0:
                 return True, slid
 
-        if not self.boss.minimap_sense:
-            time.sleep(0.15)
+        time.sleep(0.15) if not self.boss.minimap_sense else time.sleep(0.04)
 
         newFrame = self.sense()
         return not self.boss.ensure_movement or self._is_moved(newFrame, d), slid
@@ -368,7 +388,7 @@ class MazeRH:
         if self.boss.minimap_sense:
             return minimap_open_dirs(
                 extract_minimap(bgr_full_frame),
-                self.boss.masks,
+                self.boss.minimap_masks,
                 self.boss.fa_dir_threshold,
                 self.debug,
             )
@@ -390,8 +410,8 @@ class MazeRH:
         # detect enemies
         self._enemies = self._count_enemies(frame830x690hsv, frame830x690)
         if self._enemies > 0:
-            self._clear_enemies(False)
-            time.sleep(1)
+            self._clear_enemies(self.boss.minimap_sense and self.boss.use_slide)
+            time.sleep(1) if not self.boss.minimap_sense else None
 
         # detect possible directions
         self._direction_dict = self._open_dirs(
@@ -424,11 +444,11 @@ if __name__ == "__main__":
 
     # # TEST is_near_exit
     while 1:
-        # maze.sense()
-        frame830x690 = extract_game(maze.get_frame())
-        frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
-        res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
-        print(res, _)
+        maze.sense()
+        # frame830x690 = extract_game(maze.get_frame())
+        # frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
+        # res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
+        # print(res, _)
 
     # # TEST is_near_exit thresolds
     # frame = extract_game(device.get_frame2())

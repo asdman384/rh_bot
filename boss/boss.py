@@ -94,7 +94,7 @@ def measure_fill_px(roi: cv2.typing.MatLike, debug=False) -> float:
 
 
 class Boss(ABC):
-    masks = None
+    minimap_masks = None
     fa_dir_cells: dict[str, np.ndarray]
     fa_dir_threshold = {
         "ne": 18,

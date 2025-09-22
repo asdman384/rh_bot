@@ -143,6 +143,7 @@ class BotRunner:
             # fight boss
             hp = self.boss.start_fight(dir)
 
+            self.controller.wait_loading()
             # close summary
             if (
                 not wait_for(

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class BossMine(Boss):
-    masks = {
+    minimap_masks = {
         "player": {
             "l1": (150, 50, 134),
             "u1": (180, 90, 170),
@@ -38,7 +38,6 @@ class BossMine(Boss):
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
         self.use_slide = False
-        self.fa_sense = False
         self.minimap_sense = True
         self.fa_dir_threshold = {
             "ne": 40,

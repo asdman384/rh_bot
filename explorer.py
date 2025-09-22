@@ -265,14 +265,14 @@ class Explorer:
 
 
 if __name__ == "__main__":
-    from boss.boss import BossDain, BossMine
+    from boss import BossDain, BossMine, BossDelingh
     from controller import Controller
     from devices.device import Device
 
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
-    boss = BossMine(controller, False)
+    boss = BossDelingh(controller, False)
     maze = MazeRH(controller, boss, True)
     explorer = Explorer(maze, True)
 
