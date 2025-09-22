@@ -24,6 +24,7 @@ class BossDelingh(Boss):
         self.exit_check_type = "tpl"  # 'mask' | 'tpl'
         self.exit_tpl_sw = cv2.imread("resources/delingh/exit_sw.png")
         self.exit_tpl_ne = cv2.imread("resources/delingh/exit_ne.png")
+        self.exit_tpl_ne_threshold = 0.62
 
     def start_fight(self, dir: Direction) -> int:
         print("Fighting boss Delingh...") if self.debug else None

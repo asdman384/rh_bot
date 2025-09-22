@@ -77,8 +77,7 @@ class Explorer:
         self, max_steps: int = 50000, restart=True, verbose: bool = False
     ) -> Tuple[bool, int, Optional[Direction]]:
         """
-        Выполняет пошаговый поиск выхода.
-        Возвращает (reason, число_шагов).
+        Выполняет пошаговый поиск выхода. Возвращает (reason, число_шагов).
         """
         if restart:
             self._init()
@@ -96,9 +95,7 @@ class Explorer:
             # Проверка выхода
             exit = self.maze.is_exit()
             if exit[0]:
-                print(
-                    f"[OK] Exit reached at {self.pos} in {steps} steps."
-                ) if verbose else None
+                logger.debug(f"[OK] Exit reached at {self.pos} in {steps} steps.")
 
                 # TODO: return for all bosses
                 if (

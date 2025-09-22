@@ -1,17 +1,13 @@
 import asyncio
 import time
-import sys
-from contextlib import redirect_stderr, redirect_stdout
 
 from threading import Thread
 from typing import Optional
 
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes
-from collections import deque
 
 from bot import BotRunner
-from bot_utils.tee_io import _TeeIO
 from devices.device import Device
 from devices.wincap import click_in_window, find_window_by_title, screenshot_window_np
 from tg.bot_config import BotConfig
@@ -30,13 +26,10 @@ class GameBotService:
         self.bot = TelegramBot(bot_token, admin_users)
         self.window_title = window_title
         self.hwnd = None
-        self.screenshot_thread = None
-        # Rolling log storage for worker thread output
-        self._log_lines: deque[str] = deque(maxlen=2000)
-        self._stdout_tee: _TeeIO | None = None
-        self._stderr_tee: _TeeIO | None = None
+        self.game_bot_thread = None
         # Selected boss name passed via /start_game_bot argument
         self._selected_boss: str | None = None
+        self.bot_runner: BotRunner | None = None
 
         # Добавляем дополнительные команды
         self.bot.add_command_handler("screenshot", self._screenshot_command)
@@ -100,7 +93,7 @@ class GameBotService:
         """Обработчик команды /status"""
         status_message = (
             "📊 Статус бота:\n\n"
-            f"Бот активен: {self.screenshot_thread and self.screenshot_thread.is_alive()}\n"
+            f"Бот активен: {self.game_bot_thread and self.game_bot_thread.is_alive()}\n"
             f"tg Обработчиков: {len(self.bot.application.handlers[0])}"
         )
         await update.message.reply_text(status_message)
@@ -111,6 +104,7 @@ class GameBotService:
             return
 
         try:
+            # TODO: this blocks main thread
             Device.start_rogue_hearts_wsa()
             time.sleep(10)  # wait for the game to load
 
@@ -180,17 +174,9 @@ class GameBotService:
             return
 
         try:
-            # Prepare tee outputs so we don't lose console logs
-            if self._stdout_tee is None:
-                self._stdout_tee = _TeeIO(self._log_lines, sys.__stdout__)
-            if self._stderr_tee is None:
-                self._stderr_tee = _TeeIO(self._log_lines, sys.__stderr__, label="ERR ")
+            self.bot_runner = BotRunner(self._selected_boss)
+            self.bot_runner.go()
 
-            # Redirect only within this thread's execution block.
-            # Note: sys.stdout is process-wide; during this block, other threads' prints
-            # will also be captured and still forwarded to the real console.
-            with redirect_stdout(self._stdout_tee), redirect_stderr(self._stderr_tee):
-                BotRunner(self._selected_boss).go()
         except Exception as e:
             print(f"Ошибка в потоке game-бота: {e}")
             # C:\dev\python\game_bot_service.py:216: RuntimeWarning: coroutine 'TelegramBot.notify_admins' was never awaited
@@ -206,11 +192,16 @@ class GameBotService:
                 except ValueError:
                     pass
 
-            if not self._log_lines:
+            if self.bot_runner is None:
+                await update.message.reply_text("Bot is not running")
+                return
+
+            _log_lines = self.bot_runner.last_logs_handler.get_last_logs()
+            if not _log_lines:
                 await update.message.reply_text("ℹ️ Лог пуст.")
                 return
 
-            lines = list(self._log_lines)[-n:]
+            lines = list(_log_lines)[-n:]
             text = "\n".join(lines).strip()
             # Telegram имеет лимит 4096 символов на сообщение.
             if len(text) <= 4000:
@@ -270,7 +261,7 @@ class GameBotService:
         self._selected_boss = boss_arg
 
         # Далее обычный запуск
-        if self.screenshot_thread and self.screenshot_thread.is_alive():
+        if self.game_bot_thread and self.game_bot_thread.is_alive():
             print("⚠️ Сервис уже запущен, повторный запуск пропущен.")
             await update.message.reply_text(
                 "⚠️ Сервис уже запущен, повторный запуск пропущен."
@@ -288,12 +279,12 @@ class GameBotService:
             return
 
         # Запускаем поток для скриншотов
-        self.screenshot_thread = Thread(target=self._game_bot_worker, daemon=True)
-        self.screenshot_thread.start()
+        self.game_bot_thread = Thread(target=self._game_bot_worker, daemon=True)
+        self.game_bot_thread.start()
 
         status_message = (
             "📊 Статус бота:\n\n"
-            f"Бот активен: {self.screenshot_thread and self.screenshot_thread.is_alive()}\n"
+            f"Бот активен: {self.game_bot_thread and self.game_bot_thread.is_alive()}\n"
             f"tg Обработчиков: {len(self.bot.application.handlers[0])}"
         )
         await update.message.reply_text(status_message)
@@ -305,13 +296,14 @@ class GameBotService:
     ):
         """Остановка сервиса"""
         print("⏹️ Остановка сервиса game-бота...")
-        if self.screenshot_thread:
+        if self.game_bot_thread:
             # There is no safe way to forcibly kill a thread in Python.
             # You should implement a flag to signal the thread to exit gracefully.
             # For now, we just wait for it to finish (if possible).
             print("⏹️ Ожидание завершения потока game-бота...")
             # Optionally, set a flag here to signal the thread to stop if your worker supports it.
-            self.screenshot_thread.join(timeout=5)
+            self.game_bot_thread.join(timeout=5)
+            self.bot_runner = None
 
         message = "⏹️ Сервис остановлен."
         print(message)

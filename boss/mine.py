@@ -1,3 +1,4 @@
+import logging
 import time
 from math import hypot
 
@@ -8,6 +9,8 @@ from controller import Controller
 from detect_location import find_tpl, wait_for
 from frames import extract_game
 from model import Direction
+
+logger = logging.getLogger(__name__)
 
 
 class BossMine(Boss):
@@ -50,35 +53,44 @@ class BossMine(Boss):
         self.no_combat_minions = True
         self.exit_check_type = "tpl"  # 'mask' | 'tpl'
         self.exit_tpl_sw = cv2.imread("resources/mine/mine_sw.png")
+        self.exit_tpl_sw_threshold = 0.53
         self.exit_tpl_ne = cv2.imread("resources/mine/mine_ne.png")
         self.enemy1 = cv2.imread("resources/mine/enemy1.png")
+        self.enemy1_ne = cv2.imread("resources/mine/enemy1-ne.png")
         self.enemy2 = cv2.imread("resources/mine/enemy2.png")
         self.debug = True
 
     def count_enemies(self, frame830x690: cv2.typing.MatLike) -> int:
         px, py = 830 // 2, 690 // 2
         box, score = find_tpl(
-            frame830x690, self.enemy1, [1.0], score_threshold=0.62, debug=self.debug
+            frame830x690, self.enemy1, [1.0], score_threshold=0.8, debug=self.debug
         )
         if box is not None:
             dist = hypot(box["cx"] - px, box["cy"] - py)
-            return 1 if dist < 271 else 0
+            return 1 if dist < 265 else 0
 
         box, score = find_tpl(
-            frame830x690, self.enemy2, [1.0], score_threshold=0.62, debug=self.debug
+            frame830x690, self.enemy1_ne, [1.0], score_threshold=0.8, debug=self.debug
         )
         if box is not None:
             dist = hypot(box["cx"] - px, box["cy"] - py)
-            return 1 if dist < 271 else 0
+            return 1 if dist < 265 else 0
+
+        box, score = find_tpl(
+            frame830x690, self.enemy2, [1.0], score_threshold=0.8, debug=self.debug
+        )
+        if box is not None:
+            dist = hypot(box["cx"] - px, box["cy"] - py)
+            return 1 if dist < 265 else 0
 
         return 0
 
     def start_fight(self, dir: Direction) -> int:
         if dir is None:
-            print("dir not defined, cannot start fight")
+            raise "dir not defined, cannot start fight"
             return 100
 
-        print("Fighting boss Mine..." + dir.label)
+        logger.debug("Fighting boss Mine..." + dir.label)
 
         ne_route = [
             self.controller.move_N,
@@ -142,7 +154,7 @@ class BossMine(Boss):
                 self.controller.wait_loading(timeout=30)
                 break
 
-        print("Finish boss Mine..." + dir.label)
+        logger.debug("Finish boss Mine..." + dir.label)
         return 0
 
     def open_chest(self, dir: Direction) -> bool:
@@ -185,7 +197,7 @@ class BossMine(Boss):
         else:
             raise "inventory problem 2"
 
-        if not wait_for("resources/mine.png", self._get_frame, 5, 0.74):
+        if not wait_for("resources/mine.png", self._get_frame, 5, 0.34):
             print("mine not active")
 
     def _mouse_callback(self, event, x, y, flags, param):
@@ -196,7 +208,7 @@ class BossMine(Boss):
 
     def portal(self) -> None:
         mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
-        mine_box, _ = find_tpl(self._get_frame(), mine, score_threshold=0.7)
+        mine_box, _ = find_tpl(self._get_frame(), mine, score_threshold=0.34)
 
         if mine_box is None:
             raise "mine_box problem"

@@ -1,3 +1,4 @@
+import logging
 import time
 from abc import ABC, abstractmethod
 from math import hypot
@@ -7,8 +8,9 @@ import numpy as np
 
 from controller import Controller
 from detect_location import find_tpl
-from devices.device import Device
 from model import Direction
+
+logger = logging.getLogger(__name__)
 
 
 def extract_boss_health(frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
@@ -118,7 +120,9 @@ class Boss(ABC):
         self.no_combat_minions = False
         self.exit_check_type = "mask"  # 'mask' | 'tpl'
         self.exit_tpl_sw = None
+        self.exit_tpl_sw_threshold = 0.74
         self.exit_tpl_ne = None
+        self.exit_tpl_ne_threshold = 0.67
 
     @abstractmethod
     def start_fight(self, dir: Direction) -> int:
@@ -133,7 +137,7 @@ class Boss(ABC):
         self.controller.move_W() if dir == Direction.SW else self.controller.move_N()
         time.sleep(0.5)
         self.controller.skill_4()
-        time.sleep(3)
+        time.sleep(2.8)
         self.controller.move_W() if dir == Direction.SW else self.controller.move_N()
         time.sleep(0.5)
         return True
@@ -231,7 +235,11 @@ class Boss(ABC):
         X, Y, X2, Y2 = self.exit_sw_tpl_roi
         frame = cv2.resize(bgr[Y:Y2, X:X2], (X2 - X, Y2 - Y))
         box, score = find_tpl(
-            frame, self.exit_tpl_sw, [1.0], score_threshold=0.74, debug=self.debug
+            frame,
+            self.exit_tpl_sw,
+            [1.0],
+            score_threshold=self.exit_tpl_sw_threshold,
+            debug=self.debug,
         )
         if box is not None:
             return True, Direction.SW
@@ -239,7 +247,11 @@ class Boss(ABC):
         X, Y, X2, Y2 = self.exit_ne_tpl_roi
         frame = cv2.resize(bgr[Y:Y2, X:X2], (X2 - X, Y2 - Y))
         box, score = find_tpl(
-            frame, self.exit_tpl_ne, [1.0], score_threshold=0.67, debug=self.debug
+            frame,
+            self.exit_tpl_ne,
+            [1.0],
+            score_threshold=self.exit_tpl_ne_threshold,
+            debug=self.debug,
         )
         if box is not None:
             return True, Direction.NE
@@ -269,47 +281,15 @@ class Boss(ABC):
         self.controller.skill_1(p)  # focus arrow
         time.sleep(3.2)
         hp = measure_fill_px(extract_boss_health(self._get_frame()), self.debug)
-        print(f"Boss health after [focus arrow]: {hp:.1f} %") if self.debug else None
+        logger.debug(f"Boss health after [focus arrow]: {hp:.1f} %")
         return hp
 
     def _attk_barrage(self, p: cv2.typing.Point | None = None) -> float:
         self.controller.skill_2(p)  # barrage
         time.sleep(3.2)
         hp = measure_fill_px(extract_boss_health(self._get_frame()), self.debug)
-        print(f"Boss health after [barrage]: {hp:.1f} %") if self.debug else None
+        logger.debug(f"Boss health after [barrage]: {hp:.1f} %")
         return hp
 
     def fix_disaster(self):
         time.sleep(2.5)  # wait for any animation to finish
-
-
-if __name__ == "__main__":
-    try:
-        from boss.dain import BossDain
-    except ImportError:
-        from dain import BossDain
-
-    device = Device("127.0.0.1", 58526)
-    device.connect()
-    boss = BossDain(Controller(device), True)
-    boss.start_fight(Direction.SW)
-
-    # mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
-    # mine_box, _ = find_tpl(boss._get_frame(), mine, score_threshold=0.7, debug=True)
-    cv2.waitKey(0)
-    # boss.controller.click((mine_box["x"], mine_box["y"]))
-    # cv2.waitKey(0)
-
-    # res = wait_for(
-    #     "resources/dain/sw_chest.png", lambda: boss._get_frame(), 1, 0.3, True
-    # )
-
-    # print(res)
-    # cv2.waitKey(0)
-    # boss.start_fight(Direction.NE)
-
-    # while 1:
-    # hp = measure_fill_px(extract_boss_health(device.get_frame2()), True)
-    # if hp == 0:
-    #     cv2.waitKey(0)
-    # print(hp)

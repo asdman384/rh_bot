@@ -1,4 +1,6 @@
+import logging
 import time
+
 
 import cv2
 
@@ -7,6 +9,8 @@ from controller import Controller
 from db import FA_KHANEL
 from detect_location import wait_for
 from model import Direction
+
+logger = logging.getLogger(__name__)
 
 
 class BossDain(Boss):
@@ -24,7 +28,7 @@ class BossDain(Boss):
         self.exit_tpl_ne = cv2.imread("resources/dain/ne.png")
 
     def start_fight(self, dir: Direction) -> int:
-        print("Fighting boss Dain...") if self.debug else None
+        logger.debug("Fighting boss Dain...")
         self.controller.skill_3(
             (540, 360) if dir == Direction.SW else (640, 290)
         )  # slide
@@ -50,31 +54,34 @@ class BossDain(Boss):
         hp, prev_hp = 100, 100
         while hp > 0 and len(routine) > 0:
             phase_change = prev_hp > 50 and hp < 50
-            print(
-                f"steps left: {len(routine)} phase_change: {phase_change}"
-            ) if self.debug else None
-            time.sleep(1.5) if phase_change or len(routine) == 1 else None
+            logger.debug(f"steps left: {len(routine)} phase_change: {phase_change}")
+            time.sleep(1.4) if phase_change else None
+            time.sleep(2.0) if len(
+                routine
+            ) == 1 else None  # wait long animation before 4 move
             prev_hp = hp
             hp = routine.pop()()
 
-        print("Finished boss Dain...") if self.debug else None
+        logger.debug("Finished boss Dain...")
         return hp
 
     def open_chest(self, dir: Direction) -> bool:
         self.controller.move_SW() if dir == Direction.SW else self.controller.move_NE()
         time.sleep(0.5)
         self.controller.skill_4()
-        time.sleep(2.5)
+        t0 = time.time()
+        time.sleep(1.6)
         chest = f"resources/dain/{Direction.SW.label.lower()}_chest.png"
         if wait_for(chest, self._get_frame, 1, 0.68, self.debug):
-            print("wait_for chest again?")
+            logger.info("wait_for chest again?")
             self.controller.attack()
             time.sleep(3)
 
         if wait_for(chest, self._get_frame, 0.1, 0.68, self.debug):
-            print("wait_for chest again? False")
+            logger.info("wait_for chest again? False")
             return False
 
+        logger.debug(f"Chest opened in {time.time() - t0:.1f}s")
         self.controller.move_S() if dir == Direction.SW else self.controller.move_E()
         time.sleep(0.5)
         return True

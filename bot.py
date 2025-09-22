@@ -6,6 +6,7 @@ import cv2
 
 from boss import BossDelingh, BossMine, BossDain, BossKhanel, BossBhalor, BossElvira
 from bot_utils.screenshoter import save_image
+from bot_utils.logger_memory import LastLogsHandler
 from controller import Controller
 from detect_boss_room import wait_for_boss_popup
 from detect_location import find_tpl, wait_for
@@ -22,6 +23,8 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+# logging.getLogger("boss.dain").setLevel(logging.DEBUG)
+# logging.getLogger("boss.boss").setLevel(logging.DEBUG)
 
 
 class BotRunner:
@@ -33,6 +36,7 @@ class BotRunner:
         "elvira": BossElvira,
         "mine": BossMine,
     }
+    last_logs_handler: LastLogsHandler
 
     def __init__(self, boss_type: str, debug=False):
         # check if boss_type in boss_map
@@ -51,6 +55,10 @@ class BotRunner:
         self.explorer = Explorer(
             MazeRH(self.controller, self.boss, debug),
         )
+        logger.info(f"Initialized bot for boss: {boss_type}")
+
+        self.last_logs_handler = LastLogsHandler(30)
+        logger.addHandler(self.last_logs_handler)
 
     def check_main_map(self):
         monetia = cv2.imread("resources/monetia.png", cv2.IMREAD_COLOR)
@@ -100,7 +108,8 @@ class BotRunner:
                     self.boss._get_frame(),
                     f"fails/{reason}_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s).png",
                 )
-                if self.boss is BossMine:
+                if type(self.boss) is BossMine:
+                    winsound.Beep(2000, 50)
                     raise
                 self.boss.back()
                 continue
@@ -122,7 +131,8 @@ class BotRunner:
                     self.boss._get_frame(),
                     f"fails/fake-exit_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s).png",
                 )
-                if self.boss is BossMine:
+                if type(self.boss) is BossMine:
+                    winsound.Beep(2000, 50)
                     raise
                 self.boss.back()
                 continue
@@ -151,7 +161,7 @@ class BotRunner:
             self.controller.wait_loading(0.5)
 
             # open chest
-            if not self.boss.open_chest(dir) and self.boss is BossDain:
+            if not self.boss.open_chest(dir) and type(self.boss) is BossDain:
                 logger.warning("⚠️ open chest fail")
                 winsound.Beep(5000, 300)
                 time.sleep(30)
@@ -172,6 +182,9 @@ class BotRunner:
 
     def __del__(self):
         cv2.destroyAllWindows()
+        if hasattr(self, "last_logs_handler"):
+            logger.removeHandler(self.last_logs_handler)
+            self.last_logs_handler.close()
         # Destructor: clean up resources if needed
         if hasattr(self, "controller") and hasattr(self.controller, "device"):
             self.controller.device.close()
@@ -179,4 +192,4 @@ class BotRunner:
 
 
 if __name__ == "__main__":
-    BotRunner("dain").go()
+    BotRunner("delingh").go()

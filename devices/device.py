@@ -154,7 +154,7 @@ class Device:
                 [wsa_client_path, "/launch", f"wsa://{package_name}"],
                 capture_output=True,
                 text=True,
-                check=True,
+                check=False,
             )
             return result.stdout
         except subprocess.CalledProcessError as e:
