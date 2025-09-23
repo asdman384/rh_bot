@@ -23,8 +23,8 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-logging.getLogger("boss.dain").setLevel(logging.DEBUG)
-logging.getLogger("boss.boss").setLevel(logging.DEBUG)
+# logging.getLogger("boss.dain").setLevel(logging.DEBUG)
+# logging.getLogger("boss.boss").setLevel(logging.DEBUG)
 
 
 class BotRunner:
@@ -93,7 +93,10 @@ class BotRunner:
                 current_run = 1
                 continue
 
-            self.boss.tavern_Route()
+            if not self.boss.tavern_Route():
+                self.boss.back()
+                continue
+
             self.boss.portal()
 
             # explore maze

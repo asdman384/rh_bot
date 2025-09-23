@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 
 from controller import Controller
-from detect_location import find_tpl
+from detect_location import find_tpl, wait_for
 from model import Direction
 
 logger = logging.getLogger(__name__)
@@ -264,11 +264,11 @@ class Boss(ABC):
     def _get_frame(self) -> cv2.typing.MatLike:
         return self.controller.device.get_frame2()
 
-    def tavern_Route(self) -> None:
+    def tavern_Route(self) -> bool:
         self.controller.press(315, 500, 1500)  # E
         time.sleep(0.5)
         self.controller.press(270, 460, 1600)  # NE
-        time.sleep(0.8)
+        return wait_for("resources/portal.png", self._get_frame, 0.8)
 
     def back(self) -> None:
         self.controller.back()

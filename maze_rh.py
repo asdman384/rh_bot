@@ -195,13 +195,13 @@ def minimap_open_dirs(
 
     path_m = cv2.inRange(hsv, masks["path"]["l1"], masks["path"]["u1"])
     # "Утолщаем" маску с помощью морфологического расширения
-    path_m = cv2.dilate(path_m, np.ones((2, 2), np.uint8), iterations=1)
+    path_m = cv2.dilate(path_m, np.ones((3, 3), np.uint8), iterations=1)
     # wall_m1 = cv2.inRange(hsv, masks["wall"]["l1"], masks["wall"]["u1"])
     # wall_m2 = cv2.inRange(hsv, masks["wall"]["l2"], masks["wall"]["u2"])
     # lab = cv2.bitwise_or(path_m, cv2.bitwise_or(wall_m1, wall_m2))
     lab = cv2.bitwise_or(path_m, pm)
 
-    offset = {"NE": (5, -10), "NW": (-12, -10), "SW": (-12, 2), "SE": (5, 2)}
+    offset = {"NE": (5, -10), "NW": (-12, -10), "SW": (-12, 2), "SE": (4, 2)}
 
     ne = 0
     nw = 0
@@ -335,12 +335,12 @@ class MazeRH:
                 self._enemies = self._count_enemies(frame830x690hsv, frame830x690)
                 self._is_exit = self.boss.is_near_exit(frame830x690hsv, frame830x690)
             else:
-                time.sleep(0.03)
+                time.sleep(0.02)
 
             if self._is_exit[0] and self._enemies == 0:
                 return True, slid
 
-        time.sleep(0.15) if not self.boss.minimap_sense else time.sleep(0.04)
+        time.sleep(0 if self.boss.minimap_sense else 0.15)
 
         newFrame = self.sense()
         return not self.boss.ensure_movement or self._is_moved(newFrame, d), slid
@@ -365,23 +365,25 @@ class MazeRH:
         del newFrame
         return diff
 
-    def _clear_enemies(self, use_slide=True) -> bool:
-        slid = False
-        if (self.moves - self.last_combat > 3) and use_slide:
-            time.sleep(0.2)
-            self.controller.skill_3()  # slide
-            slid = True
-            self.last_combat = self.moves
-
+    def _clear_enemies(self, use_skills=True) -> bool:
         attacks_count = 0
         while self._enemies > 0 and attacks_count < 50:
+            if (
+                attacks_count == 8
+                and use_skills
+                and (self.moves - self.last_combat > 3)
+            ):
+                time.sleep(0.2)
+                self.controller.skill_4()  # multi arrow
+                time.sleep(1)
+
             self.controller.attack()
             self._enemies = self._count_enemies()
             attacks_count += 1
         time.sleep(1)
         self.moves += 1
 
-        return slid
+        return False
 
     def _count_enemies(
         self,
@@ -444,8 +446,8 @@ class MazeRH:
         # detect enemies
         self._enemies = self._count_enemies(frame830x690hsv, frame830x690)
         if self._enemies > 0:
-            self._clear_enemies(self.boss.minimap_sense and self.boss.use_slide)
-            time.sleep(1) if not self.boss.minimap_sense else None
+            self._clear_enemies(self.boss.use_slide)
+            time.sleep(0.5 if self.boss.minimap_sense else 1)
 
         # detect possible directions
         self._direction_dict = self._open_dirs(

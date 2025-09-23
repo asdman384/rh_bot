@@ -14,10 +14,10 @@ class BossDelingh(Boss):
         self.max_moves = 200
         self.use_slide = True
         self.fa_dir_threshold = {
-            "ne": 30,
-            "nw": 30,
-            "se": 30,
-            "sw": 30,
+            "ne": 50,
+            "nw": 50,
+            "se": 45,
+            "sw": 45,
         }
 
         self.enter_room_clicks = 10
@@ -81,5 +81,5 @@ class BossDelingh(Boss):
         time.sleep(2)
 
     def fix_disaster(self):
-        self.controller.move_S()
+        self.controller.move_SE()
         time.sleep(0.2)
