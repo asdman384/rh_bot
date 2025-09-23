@@ -8,7 +8,7 @@ from boss.boss import Boss
 from bot_utils.drafts import print_pixels_array
 from controller import Controller
 from count_enemies import count_enemies
-from db import RECT
+from db import NE_RECT, NW_RECT, SE_RECT, SW_RECT
 from devices.device import Device
 from edges_diff import bytes_hamming, roi_edge_signature
 from frames import extract_game
@@ -138,8 +138,8 @@ def player_mask(hsv: cv2.typing.MatLike, masks) -> cv2.typing.MatLike:
     return pm
 
 
-def draw_rect(frame, p_xy, prev_p_xy, offset):
-    for x, y in RECT:
+def draw_rect(frame, p_xy, prev_p_xy, offset, rect, color=(255, 255, 255)):
+    for x, y in rect:
         if prev_p_xy is not None:
             p_xy = (
                 prev_p_xy[0] if abs(prev_p_xy[0] - p_xy[0]) > 10 else p_xy[0],
@@ -152,12 +152,12 @@ def draw_rect(frame, p_xy, prev_p_xy, offset):
         if rect_y >= 300 or rect_x >= 350:
             continue
 
-        frame[rect_y, rect_x] = (0, 0, 255)
+        frame[rect_y, rect_x] = color
 
 
-def check_rect(frame, p_xy, prev_p_xy, offset) -> float:
+def check_rect(frame, p_xy, prev_p_xy, offset, rect) -> float:
     white_count = 0
-    for x, y in RECT:
+    for x, y in rect:
         if prev_p_xy is not None:
             p_xy = (
                 prev_p_xy[0] if abs(prev_p_xy[0] - p_xy[0]) > 10 else p_xy[0],
@@ -175,7 +175,7 @@ def check_rect(frame, p_xy, prev_p_xy, offset) -> float:
         if frame[rect_y, rect_x] == 255:
             white_count += 1
 
-    return white_count / len(RECT) * 100
+    return white_count / len(rect) * 100
 
 
 prev_p_xy = None
@@ -190,14 +190,18 @@ def minimap_open_dirs(
     global prev_p_xy
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     pm = player_mask(hsv, masks["player"])
+    pm = cv2.dilate(pm, np.ones((5, 5), np.uint8), iterations=1)
     p_xy = find_largest_contour_centroid(pm)
 
     path_m = cv2.inRange(hsv, masks["path"]["l1"], masks["path"]["u1"])
-    wall_m1 = cv2.inRange(hsv, masks["wall"]["l1"], masks["wall"]["u1"])
-    wall_m2 = cv2.inRange(hsv, masks["wall"]["l2"], masks["wall"]["u2"])
-    lab = cv2.bitwise_or(path_m, cv2.bitwise_or(wall_m1, wall_m2))
+    # "Утолщаем" маску с помощью морфологического расширения
+    path_m = cv2.dilate(path_m, np.ones((2, 2), np.uint8), iterations=1)
+    # wall_m1 = cv2.inRange(hsv, masks["wall"]["l1"], masks["wall"]["u1"])
+    # wall_m2 = cv2.inRange(hsv, masks["wall"]["l2"], masks["wall"]["u2"])
+    # lab = cv2.bitwise_or(path_m, cv2.bitwise_or(wall_m1, wall_m2))
+    lab = cv2.bitwise_or(path_m, pm)
 
-    offset = {"NE": (3, -12), "NW": (-13, -11), "SW": (-15, 1), "SE": (4, 1)}
+    offset = {"NE": (5, -10), "NW": (-12, -10), "SW": (-12, 2), "SE": (5, 2)}
 
     ne = 0
     nw = 0
@@ -208,18 +212,48 @@ def minimap_open_dirs(
         p_xy = prev_p_xy
 
     if p_xy is not None:
-        ne = check_rect(lab, p_xy, prev_p_xy, offset["NE"])
-        nw = check_rect(lab, p_xy, prev_p_xy, offset["NW"])
-        se = check_rect(lab, p_xy, prev_p_xy, offset["SE"])
-        sw = check_rect(lab, p_xy, prev_p_xy, offset["SW"])
+        ne = check_rect(lab, p_xy, prev_p_xy, offset["NE"], NE_RECT)
+        nw = check_rect(lab, p_xy, prev_p_xy, offset["NW"], NW_RECT)
+        se = check_rect(lab, p_xy, prev_p_xy, offset["SE"], SE_RECT)
+        sw = check_rect(lab, p_xy, prev_p_xy, offset["SW"], SW_RECT)
         cv2.circle(frame, p_xy, 1, (255, 255, 255), 1)
 
     if p_xy is not None:
         prev_p_xy = p_xy
 
     if debug:
-        draw_rect(frame, p_xy, prev_p_xy, offset["NE"])
-        draw_rect(frame, p_xy, prev_p_xy, offset["SW"])
+        draw_rect(
+            frame,
+            p_xy,
+            prev_p_xy,
+            offset["NE"],
+            NE_RECT,
+            (0, 255, 0) if ne > threshold["ne"] else (0, 0, 255),
+        )
+        draw_rect(
+            frame,
+            p_xy,
+            prev_p_xy,
+            offset["SW"],
+            SW_RECT,
+            (0, 255, 0) if sw > threshold["sw"] else (0, 0, 255),
+        )
+        draw_rect(
+            frame,
+            p_xy,
+            prev_p_xy,
+            offset["NW"],
+            NW_RECT,
+            (0, 255, 0) if nw > threshold["nw"] else (0, 0, 255),
+        )
+        draw_rect(
+            frame,
+            p_xy,
+            prev_p_xy,
+            offset["SE"],
+            SE_RECT,
+            (0, 255, 0) if se > threshold["se"] else (0, 0, 255),
+        )
         cv2.imshow("minimap/frame", frame)
         cv2.imshow("minimap/pm", pm)
         cv2.putText(
@@ -273,7 +307,7 @@ class MazeRH:
         self._is_exit = (False, None)
         self.moves = 0
         self.last_combat = 0
-        time.sleep(0.5)
+        time.sleep(0.25)
         self.sense()
 
     def is_exit(self) -> tuple[bool, Direction | None]:

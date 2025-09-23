@@ -56,9 +56,10 @@ class BossDain(Boss):
             phase_change = prev_hp > 50 and hp < 50
             logger.debug(f"steps left: {len(routine)} phase_change: {phase_change}")
             time.sleep(1.4) if phase_change else None
-            time.sleep(2.0) if len(
-                routine
-            ) == 1 else None  # wait long animation before 4 move
+            if len(routine) == 1:
+                time.sleep(
+                    3.0 if dir == Direction.NE else 2.0
+                )  # wait long animation before 4 move
             prev_hp = hp
             hp = routine.pop()()
 

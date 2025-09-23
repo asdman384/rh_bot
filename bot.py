@@ -23,8 +23,8 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-# logging.getLogger("boss.dain").setLevel(logging.DEBUG)
-# logging.getLogger("boss.boss").setLevel(logging.DEBUG)
+logging.getLogger("boss.dain").setLevel(logging.DEBUG)
+logging.getLogger("boss.boss").setLevel(logging.DEBUG)
 
 
 class BotRunner:
