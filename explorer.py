@@ -165,7 +165,7 @@ class Explorer:
             # cv2.waitKey(1)
 
         logger.debug(f"[END] Step limit {max_steps} reached.")
-        return "[END] Step limit {max_steps} reached.", steps, None
+        return f"[END] Step limit {max_steps} reached.", steps, None
 
     # --- Взаимодействие с API ---
 
@@ -173,13 +173,9 @@ class Explorer:
         return self.maze.can_move(d)
 
     def _move(self, d: Direction) -> bool:
-        isMoved, hasSlid = self.maze.move(d)
-        multiplier = 2 if hasSlid else 1
+        isMoved = self.maze.move(d)
         if isMoved:
-            self.pos = (
-                self.pos[0] + d.dx * multiplier,
-                self.pos[1] + d.dy * multiplier,
-            )
+            self.pos = (self.pos[0] + d.dx, self.pos[1] + d.dy)
         return isMoved
 
     # --- Сенсорика и обновление памяти ---

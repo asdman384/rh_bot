@@ -12,7 +12,7 @@ class BossDelingh(Boss):
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
         self.max_moves = 200
-        self.use_slide = True
+        self.use_slide = False
         self.fa_dir_threshold = {
             "ne": 50,
             "nw": 50,

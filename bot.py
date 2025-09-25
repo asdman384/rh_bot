@@ -1,12 +1,13 @@
 import logging
+import sys
 import time
 import winsound
 
 import cv2
 
-from boss import BossDelingh, BossMine, BossDain, BossKhanel, BossBhalor, BossElvira
-from bot_utils.screenshoter import save_image
+from boss import BossBhalor, BossDain, BossDelingh, BossElvira, BossKhanel, BossMine
 from bot_utils.logger_memory import LastLogsHandler
+from bot_utils.screenshoter import save_image
 from controller import Controller
 from detect_boss_room import wait_for_boss_popup
 from detect_location import find_tpl, wait_for
@@ -25,6 +26,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 # logging.getLogger("boss.dain").setLevel(logging.DEBUG)
 # logging.getLogger("boss.boss").setLevel(logging.DEBUG)
+
+# GENERAL TODO:
+# improve combat skills CD detection
+# improve enemies health bars detection
 
 
 class BotRunner:
@@ -127,12 +132,13 @@ class BotRunner:
             if not wait_for_boss_popup(
                 self.boss._get_frame, timeout_s=10, debug=self.debug
             ):
+                dir = dir.label if dir is not None else "None"
                 logger.info(
-                    f"❌ - Run #{self.run:03d} - t:{time.time() - t0:.1f}s - m:{moves} - r:fake exit"
+                    f"❌ - Run #{self.run:03d} - t:{time.time() - t0:.1f}s - m:{moves} - r:fake exit dir:{dir}"
                 )
                 save_image(
                     self.boss._get_frame(),
-                    f"fails/fake-exit_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s).png",
+                    f"fails/fake-exit_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s)({dir}).png",
                 )
                 if type(self.boss) is BossMine:
                     winsound.Beep(2000, 50)
@@ -196,4 +202,9 @@ class BotRunner:
 
 
 if __name__ == "__main__":
-    BotRunner("delingh").go()
+    if len(sys.argv) > 1:
+        boss_arg = sys.argv[1]
+    else:
+        boss_arg = "dain"
+
+    BotRunner(boss_arg).go()

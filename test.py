@@ -47,11 +47,15 @@ from devices.device import Device
 # cv2.imshow("empty", panel)
 # cv2.setMouseCallback("empty", mouse_callback)
 
+x, y = 557, 370
 
-def mouse_callback(event, x, y, flags, param):
+
+def mouse_callback(event, x_, y_, flags, param):
+    global x, y
     if event != cv2.EVENT_LBUTTONDOWN:
         return
-    print(f"x={x}, y={y}")
+    x, y = x_, y_
+    print(f"x={x_}, y={y_}")
 
 
 device = Device("127.0.0.1", 58526)
@@ -71,6 +75,6 @@ device.close()
 #     cv2.waitKey(0)
 
 
-# for _ in range(156):
-#     device.click((557, 370))
-#     time.sleep(0.05)
+for _ in range(38):
+    device.click((x, y))
+    time.sleep(0.04)

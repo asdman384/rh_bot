@@ -6,7 +6,7 @@ import cv2
 
 from boss.boss import Boss
 from controller import Controller
-from db import FA_KHANEL
+from db import FA_BHALOR, FA_KHANEL
 from detect_location import wait_for
 from model import Direction
 
@@ -14,18 +14,59 @@ logger = logging.getLogger(__name__)
 
 
 class BossDain(Boss):
+    initial_minimap_open_dirs2 = {
+        Direction.NE.label: False,
+        Direction.NW.label: False,
+        Direction.SE.label: True,
+        Direction.SW.label: False,
+    }
+
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
-        self._dist_thresh_px = 350
         self.max_moves = 100
-        self.fa_dir_cells = FA_KHANEL
-        self.ensure_movement = False
-        self.exit_door_area_threshold = 300
+        self.fa_dir_cells = FA_BHALOR
         self.enter_room_clicks = 10
         self.no_combat_minions = True
         self.exit_check_type = "tpl"  # 'mask' | 'tpl'
+        self.exit_tpl_sw_threshold = 0.57
         self.exit_tpl_sw = cv2.imread("resources/dain/sw.png")
         self.exit_tpl_ne = cv2.imread("resources/dain/ne.png")
+
+        self.ensure_movement = False
+        self.minimap_sense = False
+        if self.minimap_sense:
+            self.fa_dir_threshold = {
+                "ne": 50,
+                "nw": 50,
+                "se": 45,
+                "sw": 45,
+            }
+        self.minimap_masks = {
+            "player": {
+                "bgr": (132, 113, 156),  # B,G,R
+                "l1": (0, 0, 0),
+                "u1": (0, 0, 0),
+                "l2": (0, 0, 0),
+                "u2": (0, 0, 0),
+            },
+            "path": {
+                "l1": (85, 60, 40),
+                "u1": (140, 255, 255),
+                "l2": (86, 60, 80),
+                "u2": (130, 125, 120),
+            },
+            "wall": {
+                "l1": (0, 0, 0),
+                "u1": (0, 0, 0),
+                "l2": (0, 0, 0),
+                "u2": (0, 0, 0),
+            },
+        }
+
+    def init_camera(self) -> None:
+        if self.minimap_sense:
+            return
+        super().init_camera()
 
     def start_fight(self, dir: Direction) -> int:
         logger.debug("Fighting boss Dain...")
@@ -58,7 +99,7 @@ class BossDain(Boss):
             time.sleep(1.4) if phase_change else None
             if len(routine) == 1:
                 time.sleep(
-                    3.0 if dir == Direction.NE else 2.0
+                    4.0 if dir == Direction.NE else 2.0
                 )  # wait long animation before 4 move
             prev_hp = hp
             hp = routine.pop()()
@@ -67,8 +108,8 @@ class BossDain(Boss):
         return hp
 
     def open_chest(self, dir: Direction) -> bool:
-        self.controller.move_SW() if dir == Direction.SW else self.controller.move_NE()
-        time.sleep(0.5)
+        None if dir == Direction.SW else self.controller.move_NE()
+        time.sleep(0.2) if dir == Direction.NE else None
         self.controller.skill_4()
         t0 = time.time()
         time.sleep(1.6)
@@ -84,6 +125,8 @@ class BossDain(Boss):
 
         logger.debug(f"Chest opened in {time.time() - t0:.1f}s")
         self.controller.move_S() if dir == Direction.SW else self.controller.move_E()
+        time.sleep(0.1)
+        self.controller.move_SW() if dir == Direction.SW else self.controller.move_NE()
         time.sleep(0.5)
         return True
 

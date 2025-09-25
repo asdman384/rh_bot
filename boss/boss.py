@@ -132,6 +132,10 @@ class Boss(ABC):
     def portal(self) -> None:
         pass
 
+    def init_camera(self) -> None:
+        self.controller.move_SE()
+        self.controller.move_NW()
+
     def open_chest(self, dir: Direction) -> bool:
         # open chest
         self.controller.move_W() if dir == Direction.SW else self.controller.move_N()
@@ -271,6 +275,7 @@ class Boss(ABC):
         return wait_for("resources/portal.png", self._get_frame, 0.8)
 
     def back(self) -> None:
+        # raise 'back'  # debug
         self.controller.back()
         time.sleep(0.2)
         self.controller._tap((740, 500))  # select yes
