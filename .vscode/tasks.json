@@ -21,8 +21,11 @@
             "description": "Select the boss",
             "options": [
                 "dain",
-                "option2",
-                "option3"
+                "bhalor",
+                "khanel",
+                "delingh",
+                "elvira",
+                "mine",
             ]
         }
     ]

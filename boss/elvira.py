@@ -4,7 +4,7 @@ import cv2
 
 from boss.boss import Boss
 from controller import Controller
-from db import FA_KHANEL
+from db import FA_BHALOR
 from detect_location import find_tpl
 from model import Direction
 
@@ -25,17 +25,21 @@ class BossElvira(Boss):
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
         self._dist_thresh_px = 350
-        self.max_moves = 100
-        self.fa_dir_cells = FA_KHANEL
+        self.max_moves = 150
+        self.fa_dir_cells = FA_BHALOR
         self.exit_door_area_threshold = 1600
         self.enter_room_clicks = 10
         self.use_slide = False
+        self.enter_room_clicks = 18
         self.fa_dir_threshold = {
             "ne": 11,
             "nw": 11,
             "se": 11,
             "sw": 11,
         }
+
+    def init_camera(self) -> None:
+        self.controller.move_E()
 
     def start_fight(self, dir: Direction) -> int:
         if dir == Direction.NE:
@@ -71,10 +75,8 @@ class BossElvira(Boss):
         return hp
 
     def open_chest(self, dir: Direction) -> bool:
-        self.controller.move_SW() if dir == Direction.SW else self.controller.move_NE()
-        time.sleep(0.5)
         self.controller.skill_4()
-        time.sleep(2.6)
+        time.sleep(2.7)
         self.controller.move_S() if dir == Direction.SW else self.controller.move_E()
         time.sleep(0.5)
         return True

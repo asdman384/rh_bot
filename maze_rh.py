@@ -253,14 +253,14 @@ class MazeRH:
 
     def _get_frame_fa(self) -> cv2.typing.MatLike:
         if not self.boss.minimap_sense:
-            self.controller._tap(self.controller.skill_1_point)
-            time.sleep(0.1)
+            self.controller.click(self.controller.skill_1_point)
+            time.sleep(0.095)
 
         frame = self.get_frame()
 
         if not self.boss.minimap_sense:
-            self.controller._tap(self.controller.skill_1_point_cancel)
-            time.sleep(0.05)
+            self.controller.click(self.controller.skill_1_point_cancel)
+            time.sleep(0.055)
 
         return frame
 
@@ -314,21 +314,21 @@ class MazeRH:
 
 
 if __name__ == "__main__":
-    from boss import BossDelingh, BossDain
+    from boss import BossDelingh, BossDain, BossElvira
 
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
-    boss = BossDain(controller, True)
+    boss = BossElvira(controller, True)
     maze = MazeRH(controller, boss, True)
 
     # # TEST is_near_exit
     while 1:
-        # maze.sense()
-        frame830x690 = extract_game(maze.get_frame())
-        frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
-        res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
-        print(res, _)
+        maze.sense()
+        # frame830x690 = extract_game(maze.get_frame())
+        # frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
+        # res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
+        # print(res, _)
 
     # # TEST is_near_exit thresolds
     # frame = extract_game(device.get_frame2())
