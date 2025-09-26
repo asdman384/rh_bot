@@ -222,14 +222,14 @@ if __name__ == "__main__":
     controller = Controller(device)
     boss = BossElvira(controller, True)
     maze = MazeRH(controller, boss, True)
-    maze.init_camera()
+    # maze.init_camera()
     # # TEST is_near_exit
     while 1:
-        maze.sense()
-        # frame830x690 = extract_game(maze.get_frame())
-        # frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
-        # res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
-        # print(res, _)
+        # maze.sense()
+        frame830x690 = extract_game(maze.get_frame())
+        frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
+        res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
+        print(res, _)
 
     # # TEST is_near_exit thresolds
     # frame = extract_game(device.get_frame2())

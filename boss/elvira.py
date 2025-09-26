@@ -11,18 +11,6 @@ from sensor import FaSensor
 
 
 class BossElvira(Boss):
-    SW_GATE_LOW1 = (144, 209, 25)
-    SW_GATE_UPP1 = (150, 220, 29)
-    SW_GATE_LOW2 = (141, 220, 30)
-    SW_GATE_UPP2 = (151, 230, 33)
-    SW_GATE_LOW3 = (136, 244, 17)
-    SW_GATE_UPP3 = (151, 255, 32)
-
-    NE_GATE_LOW1 = (134, 173, 42)
-    NE_GATE_UPP1 = (138, 221, 75)
-    NE_GATE_LOW2 = (134, 173, 42)
-    NE_GATE_UPP2 = (138, 221, 75)
-
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
         self._dist_thresh_px = 350
@@ -30,6 +18,12 @@ class BossElvira(Boss):
         self.exit_door_area_threshold = 1600
         self.enter_room_clicks = 10
         self.enter_room_clicks = 18
+
+        self.exit_check_type = "tpl"  # 'mask' | 'tpl'
+        self.exit_tpl_sw_threshold = 0.70
+        self.exit_tpl_ne_threshold = 0.78
+        self.exit_tpl_sw = cv2.imread("resources/elvira/sw.png")
+        self.exit_tpl_ne = cv2.imread("resources/elvira/ne.png")
 
     def init_camera(self) -> None:
         self.sensor = FaSensor(
@@ -86,7 +80,7 @@ class BossElvira(Boss):
         time.sleep(2)
 
     def fix_disaster(self):
-        time.sleep(0.5)  # wait for any animation to finish
+        time.sleep(0.7)  # wait for any animation to finish
         exit_ban = cv2.imread("resources/elvira_exit_ban.png", cv2.IMREAD_COLOR)
         exit_ban_box, _ = find_tpl(
             self._get_frame(), exit_ban, score_threshold=0.9, debug=self.debug
