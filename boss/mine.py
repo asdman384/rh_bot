@@ -9,6 +9,7 @@ from controller import Controller
 from detect_location import find_tpl, wait_for
 from frames import extract_game
 from model import Direction
+from sensor import MinimapSensor
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +38,6 @@ class BossMine(Boss):
 
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
-        self.use_slide = False
-        self.minimap_sense = True
-        self.fa_dir_threshold = {
-            "ne": 40,
-            "nw": 40,
-            "se": 40,
-            "sw": 40,
-        }
         self._dist_thresh_px = 400
         self.max_moves = 1000
         self.enter_room_clicks = 5
@@ -58,6 +51,16 @@ class BossMine(Boss):
         self.enemy1_ne = cv2.imread("resources/mine/enemy1-ne.png")
         self.enemy2 = cv2.imread("resources/mine/enemy2.png")
         self.debug = True
+
+    def init_camera(self) -> None:
+        self.sensor = MinimapSensor(
+            None,
+            self.minimap_masks,
+            {"ne": 40, "nw": 40, "se": 40, "sw": 40},
+            debug=self.debug,
+        )
+        self.controller.move_SE()
+        self.controller.move_NW()
 
     def count_enemies(self, frame830x690: cv2.typing.MatLike) -> int:
         px, py = 830 // 2, 690 // 2

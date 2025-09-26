@@ -268,7 +268,7 @@ if __name__ == "__main__":
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
-    boss = BossDelingh(controller, False)
+    boss = BossDain(controller, True)
     maze = MazeRH(controller, boss, True)
     explorer = Explorer(maze, True)
 

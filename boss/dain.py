@@ -6,9 +6,10 @@ import cv2
 
 from boss.boss import Boss
 from controller import Controller
-from db import FA_BHALOR, FA_KHANEL
+from db import FA_BHALOR
 from detect_location import wait_for
 from model import Direction
+from sensor import MinimapSensor2
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class BossDain(Boss):
 
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
+
         self.max_moves = 100
         self.fa_dir_cells = FA_BHALOR
         self.enter_room_clicks = 10
@@ -33,14 +35,7 @@ class BossDain(Boss):
         self.exit_tpl_ne = cv2.imread("resources/dain/ne.png")
 
         self.ensure_movement = False
-        self.minimap_sense = False
-        if self.minimap_sense:
-            self.fa_dir_threshold = {
-                "ne": 50,
-                "nw": 50,
-                "se": 45,
-                "sw": 45,
-            }
+
         self.minimap_masks = {
             "player": {
                 "bgr": (132, 113, 156),  # B,G,R
@@ -64,6 +59,14 @@ class BossDain(Boss):
         }
 
     def init_camera(self) -> None:
+        self.controller.move_E()
+        time.sleep(0.2)
+        self.sensor = MinimapSensor2(
+            self._get_frame(), self.minimap_masks, debug=self.debug
+        )
+
+        return
+
         if self.minimap_sense:
             return
         super().init_camera()

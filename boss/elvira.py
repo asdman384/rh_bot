@@ -7,6 +7,7 @@ from controller import Controller
 from db import FA_BHALOR
 from detect_location import find_tpl
 from model import Direction
+from sensor import FaSensor
 
 
 class BossElvira(Boss):
@@ -26,19 +27,18 @@ class BossElvira(Boss):
         super().__init__(controller, debug)
         self._dist_thresh_px = 350
         self.max_moves = 150
-        self.fa_dir_cells = FA_BHALOR
         self.exit_door_area_threshold = 1600
         self.enter_room_clicks = 10
-        self.use_slide = False
         self.enter_room_clicks = 18
-        self.fa_dir_threshold = {
-            "ne": 11,
-            "nw": 11,
-            "se": 11,
-            "sw": 11,
-        }
 
     def init_camera(self) -> None:
+        self.sensor = FaSensor(
+            None,
+            None,
+            {"ne": 20, "nw": 20, "se": 20, "sw": 20},
+            debug=self.debug,
+        )
+        self.sensor.dir_cells = FA_BHALOR
         self.controller.move_E()
 
     def start_fight(self, dir: Direction) -> int:

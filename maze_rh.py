@@ -11,7 +11,6 @@ from devices.device import Device
 from edges_diff import bytes_hamming, roi_edge_signature
 from frames import extract_game
 from model import Direction
-from sensing.minimap import minimap_open_dirs
 
 LOWER = np.array([95, 90, 99])
 UPPER = np.array([105, 137, 181])
@@ -24,21 +23,6 @@ THRESHOLD_BITS = 38
 logger = logging.getLogger(__name__)
 
 
-def put_labels(
-    frame: cv2.typing.MatLike, text: str, p: cv2.typing.Point
-) -> cv2.typing.MatLike:
-    cv2.putText(
-        frame,
-        text,
-        p,
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.5,
-        (255,),
-        1,
-        cv2.LINE_AA,
-    )
-
-
 def extract_center(frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
     X = 640 - 150 - 1
     Y = 345 - 80
@@ -47,80 +31,15 @@ def extract_center(frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
     return cv2.resize(frame[Y : Y + H, X : X + W], (W, H))
 
 
-def extract_minimap(frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
-    X = 0
-    Y = 100
-    W = 350
-    H = 300
-    return cv2.resize(frame[Y : Y + H, X : X + W], (W, H))
-
-
-def direction_possibility(dir: np.ndarray[tuple[int, int]], mask: np.ndarray) -> float:
-    vals = mask[tuple(dir.T)]
-    i = int((vals > 220).sum())
-    return i / len(dir) * 100
-
-
-def fa_get_open_dirs(
-    bgr_img, dir_cells: dict[str, np.ndarray], dir_threshold, debug=False
-):
-    """
-    Focused arrow sensing.
-
-    bgr_img - image with 'Focused arrow' grid applied
-    """
-    gray = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    g = clahe.apply(gray)
-    # выделяем тонкие яркие линии сетки
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
-    tophat = cv2.morphologyEx(g, cv2.MORPH_TOPHAT, kernel)
-    tophat = cv2.GaussianBlur(tophat, (3, 3), 0)
-    th = max(30, int(0.35 * tophat.max()))
-    _, mask = cv2.threshold(tophat, th, 255, cv2.THRESH_BINARY)
-
-    # print_pixels_array(mask)
-    # clean ?
-    # mask = cv2.medianBlur(mask, 3)
-    # cv2.imshow("mask", mask)
-    # cv2.waitKey(0)
-    # more clean ?
-    # mask = cv2.morphologyEx(
-    #     mask, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    # )
-    # cv2.imshow("mask", mask)
-    # cv2.waitKey(0)
-
-    ne = direction_possibility(dir_cells["NE_RECT"], mask)
-    se = direction_possibility(dir_cells["SE_RECT"], mask)
-    sw = direction_possibility(dir_cells["SW_RECT"], mask)
-    nw = direction_possibility(dir_cells["NW_RECT"], mask)
-
-    if debug:
-        put_labels(mask, f"NE:{ne:.1f}", (220 + 250, 300))
-        put_labels(mask, f"NW:{nw:.1f}", (10 + 250, 300))
-        put_labels(mask, f"SE:{se:.1f}", (220 + 250, 170 + 265))
-        put_labels(mask, f"SW:{sw:.1f}", (10 + 250, 170 + 265))
-        cv2.imshow("get_open_dirs/DBG", mask)
-        cv2.waitKey(1)
-
-    return {
-        Direction.NE.label: ne > dir_threshold["ne"],
-        Direction.NW.label: nw > dir_threshold["nw"],
-        Direction.SE.label: se > dir_threshold["se"],
-        Direction.SW.label: sw > dir_threshold["sw"],
-    }
-
-
 class MazeRH:
     _is_exit: tuple[bool, Direction | None] = (False, None)
     _enemies = 0
     _last_frame: bytes | None = None
     _direction_dict = {
-        Direction.NE.label: False,
-        Direction.NW.label: False,
-        Direction.SE.label: False,
-        Direction.SW.label: False,
+        Direction.NE: False,
+        Direction.NW: False,
+        Direction.SE: False,
+        Direction.SW: False,
     }
 
     def __init__(
@@ -165,13 +84,13 @@ class MazeRH:
         if move is None:
             raise AttributeError(f"Movement has no method move_{d.label}")
 
-        steps = 2 if self.boss.minimap_sense else 3
-        for _ in range(steps):
+        for _ in range(self.boss.sensor.steps):
             if self._enemies > 0:
                 self._clear_enemies(self.boss.use_slide)
             move()
+            self.boss.sensor.move(d)
 
-            if not self.boss.minimap_sense and _ != 2:
+            if self.boss.sensor.fa and _ != 2:
                 frame830x690 = extract_game(self.get_frame())
                 frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
                 self._enemies = self._count_enemies(frame830x690hsv, frame830x690)
@@ -182,7 +101,7 @@ class MazeRH:
             if self._is_exit[0] and self._enemies == 0:
                 return True
 
-        time.sleep(0 if self.boss.minimap_sense else 0.15)
+        time.sleep(0.15 if self.boss.sensor.fa else 0)
 
         newFrame = self.sense()
         return not self.boss.ensure_movement or self._is_moved(newFrame, d)
@@ -246,39 +165,26 @@ class MazeRH:
         return count_enemies(frame830x690hsv, self.debug)
 
     def can_move(self, d: Direction) -> bool:
-        return self._direction_dict.get(d.label, False)
+        return self._direction_dict.get(d, False)
 
     def get_frame(self) -> cv2.typing.MatLike:
         return self.controller.device.get_frame2()
 
     def _get_frame_fa(self) -> cv2.typing.MatLike:
-        if not self.boss.minimap_sense:
+        if self.boss.sensor.fa:
             self.controller.click(self.controller.skill_1_point)
-            time.sleep(0.095)
+            time.sleep(0.1)
 
         frame = self.get_frame()
 
-        if not self.boss.minimap_sense:
+        if self.boss.sensor.fa:
             self.controller.click(self.controller.skill_1_point_cancel)
             time.sleep(0.055)
 
         return frame
 
-    def _open_dirs(self, bgr_full_frame):
-        if self.boss.minimap_sense:
-            return minimap_open_dirs(
-                extract_minimap(bgr_full_frame),
-                self.boss.minimap_masks,
-                self.boss.fa_dir_threshold,
-                self.debug,
-            )
-
-        return fa_get_open_dirs(
-            bgr_full_frame,
-            self.boss.fa_dir_cells,
-            self.boss.fa_dir_threshold,
-            self.debug,
-        )
+    def _open_dirs(self, frame):
+        return self.boss.sensor.open_dirs(frame)
 
     def sense(self) -> cv2.typing.MatLike:
         decoded = self._get_frame_fa()
@@ -291,12 +197,9 @@ class MazeRH:
         self._enemies = self._count_enemies(frame830x690hsv, frame830x690)
         if self._enemies > 0:
             self._clear_enemies(self.boss.use_slide)
-            time.sleep(0.5 if self.boss.minimap_sense else 1)
 
         # detect possible directions
-        self._direction_dict = self._open_dirs(
-            frame830x690 if not self.boss.minimap_sense else decoded
-        )
+        self._direction_dict = self._open_dirs(decoded)
 
         # Check if all directions are zero
         if all(not v for v in self._direction_dict.values()):
@@ -306,9 +209,7 @@ class MazeRH:
             self.boss.fix_disaster()
             decoded = self._get_frame_fa()
             frame830x690 = extract_game(decoded)
-            self._direction_dict = self._open_dirs(
-                frame830x690 if not self.boss.minimap_sense else decoded
-            )
+            self._direction_dict = self._open_dirs(decoded)
 
         return decoded
 
@@ -321,7 +222,7 @@ if __name__ == "__main__":
     controller = Controller(device)
     boss = BossElvira(controller, True)
     maze = MazeRH(controller, boss, True)
-
+    maze.init_camera()
     # # TEST is_near_exit
     while 1:
         maze.sense()

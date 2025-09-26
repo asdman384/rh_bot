@@ -4,8 +4,8 @@ import cv2
 
 from boss.boss import Boss
 from controller import Controller
-from db import FA_BHALOR
 from model import Direction
+from sensor import MinimapSensor
 
 
 class BossDelingh(Boss):
@@ -13,12 +13,6 @@ class BossDelingh(Boss):
         super().__init__(controller, debug)
         self.max_moves = 200
         self.use_slide = False
-        self.fa_dir_threshold = {
-            "ne": 50,
-            "nw": 50,
-            "se": 45,
-            "sw": 45,
-        }
 
         self.enter_room_clicks = 10
         self.ensure_movement = True
@@ -28,7 +22,6 @@ class BossDelingh(Boss):
         self.exit_tpl_ne = cv2.imread("resources/delingh/exit_ne.png")
         self.exit_tpl_ne_threshold = 0.62
 
-        self.minimap_sense = True
         self.minimap_masks = {
             "player": {
                 "l1": (161, 50, 134),
@@ -49,6 +42,16 @@ class BossDelingh(Boss):
                 "u2": (111, 172, 134),
             },
         }
+
+    def init_camera(self) -> None:
+        self.sensor = MinimapSensor(
+            None,
+            self.minimap_masks,
+            {"ne": 50, "nw": 50, "se": 45, "sw": 45},
+            debug=self.debug,
+        )
+        self.controller.move_SE()
+        self.controller.move_NW()
 
     def start_fight(self, dir: Direction) -> int:
         print("Fighting boss Delingh...") if self.debug else None

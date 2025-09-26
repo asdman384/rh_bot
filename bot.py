@@ -91,7 +91,7 @@ class BotRunner:
             self.check_town()
 
             # flush bag and back to main map
-            if type(self.boss) is not BossMine and current_run % 40 == 0:  # every N run
+            if type(self.boss) is not BossMine and current_run % 30 == 0:  # every N run
                 self.boss.back()
                 self.controller.flush_bag(decompose=True)
                 self.controller.full_back()

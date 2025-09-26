@@ -9,6 +9,7 @@ import numpy as np
 from controller import Controller
 from detect_location import find_tpl, wait_for
 from model import Direction
+from sensor import Sensor
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,7 @@ def measure_fill_px(roi: cv2.typing.MatLike, debug=False) -> float:
 
 
 class Boss(ABC):
+    sensor: Sensor | None = None
     minimap_masks = None
     fa_dir_cells: dict[str, np.ndarray]
     fa_dir_threshold = {
@@ -109,13 +111,12 @@ class Boss(ABC):
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         self.controller = controller
         self.debug = debug
-        self.minimap_sense = False
         self.ensure_movement = True
         self._dist_thresh_px = 300
         self.max_moves = 500
         self.exit_door_area_threshold = 3000
         self.enter_room_clicks = 12
-        self.use_slide = True
+        self.use_slide = False
         self.exit_dbg_area: list = []
         self.no_combat_minions = False
         self.exit_check_type = "mask"  # 'mask' | 'tpl'
@@ -199,7 +200,7 @@ class Boss(ABC):
         dist = None
         for c in cnts:
             area = cv2.contourArea(c)
-            print(area) if self.debug else None
+            print(f"area={area}") if self.debug else None
             if area > self.exit_door_area_threshold:
                 M = cv2.moments(c)
                 if M["m00"] != 0:
