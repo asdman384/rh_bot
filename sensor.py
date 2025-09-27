@@ -31,6 +31,7 @@ class Sensor(ABC):
         self._blue_mask = None
         self.thresholds = thresholds
         self.steps = 1
+        self.fa = False
 
     def move(self, dir: Direction) -> tuple[float, float]:
         return 0.0, 0.0
@@ -56,7 +57,20 @@ class Sensor(ABC):
         hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, mask_colors["l1"], mask_colors["u1"])
         # Убираем шум, заполняем дырки
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+        # create a custom diamond-shaped kernel
+        kernel = np.array(
+            [
+                [0, 0, 0, 0, 1, 0, 0, 0, 0],
+                [0, 0, 1, 1, 1, 1, 1, 0, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 0],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [0, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 0, 1, 1, 1, 1, 1, 0, 0],
+                [0, 0, 0, 0, 1, 0, 0, 0, 0],
+            ],
+            dtype=np.uint8,
+        )
+        # kernel = cv2.getStructuringElement(cv2.MORPH_DIAMOND, (7, 7))
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
 
@@ -66,26 +80,29 @@ class Sensor(ABC):
             self._blue_mask = mask
 
         if self.debug:
-            cv2.imshow("_blue_mask", self._blue_mask)
+            cv2.imshow("Sensor/blue_mask", self._blue_mask)
             cv2.waitKey(1)
 
         return self._blue_mask
 
 
 class MinimapSensor2(Sensor):
-    max_len = 30
-    dirs = {
-        Direction.NE: 324,
-        Direction.NW: 218,
-        Direction.SE: 37,
-        Direction.SW: 144,
+    max_len = 20
+    step = 3.33
+    moves = 0
+
+    dirs_angle = {
+        Direction.SE: 35.5,
+        Direction.SW: 144.5,
+        Direction.NW: 215.5,
+        Direction.NE: 324.5,
     }
 
-    def __init__(self, frame, mask_colors, debug=False):
-        super().__init__(frame, mask_colors, debug)
+    def __init__(self, frame, mask_colors, thresholds=None, debug=False):
+        super().__init__(frame, mask_colors, thresholds, debug)
 
         minimap = self.extract_minimap(frame)
-        blue_mask = self.find_blue_mask(minimap, mask_colors)
+        blue_mask = self.find_blue_mask(minimap, self.mask_colors["path"])
         h, w = blue_mask.shape[:2]
         white_pixels = np.column_stack(np.where(blue_mask == 255))
         if white_pixels.size == 0:
@@ -97,42 +114,35 @@ class MinimapSensor2(Sensor):
         if debug:
             cv2.circle(minimap, self.current_xy, 2, (0, 255, 255), 1)
             cv2.imshow("Sensor/start", minimap)
-            cv2.waitKey(1)
+            cv2.waitKey(0)
+
+    def _calibrate_initial_xy(self, blue_mask):
+        print("Calibrating initial position...")
+        ne_length = self.ray_len(
+            blue_mask, *self.current_xy, self.dirs_angle[Direction.NE]
+        )
+        sw_length = self.ray_len(
+            blue_mask, *self.current_xy, self.dirs_angle[Direction.SW]
+        )
+        diff = (ne_length - sw_length) / 2
+        dx = diff * math.cos(math.radians(self.dirs_angle[Direction.NE]))
+        dy = diff * math.sin(math.radians(self.dirs_angle[Direction.NE]))
+        self.current_xy = (self.current_xy[0] + dx, self.current_xy[1] + dy)
+        pass
 
     def move(self, dir: Direction) -> tuple[float, float]:
-        step = 3.25
-        dx = math.cos(math.radians(self.dirs[dir])) * step
-        dy = math.sin(math.radians(self.dirs[dir])) * step
+        dx = math.cos(math.radians(self.dirs_angle[dir])) * self.step
+        dy = math.sin(math.radians(self.dirs_angle[dir])) * self.step
         self.current_xy = (self.current_xy[0] + dx, self.current_xy[1] + dy)
+        self.moves += 1
+        if self.moves == 2:
+            self._calibrate_initial_xy(self._blue_mask)
         return self.current_xy
 
     def open_dirs(
         self,
         frame: cv2.typing.MatLike,
     ) -> dict:
-        lengths = {}
-
-        minimap = self.extract_minimap(frame)
-        mask = self.find_blue_mask(minimap, self.mask_colors["path"])
-
-        for dir in self.dirs.keys():
-            lengths[dir] = self._test_direction(
-                mask, dir, minimap if self.debug else None
-            )
-
-        if self.debug:
-            cv2.putText(
-                minimap,
-                f"sw={lengths[Direction.SW]:.1f}, nw={lengths[Direction.NW]:.1f}, se={lengths[Direction.SE]:.1f}, ne={lengths[Direction.NE]:.1f}",
-                (10, 20),
-                0,
-                0.5,
-                (255, 255, 255),
-                1,
-            )
-            cv2.imshow("Sensor/open_dirs", minimap)
-            cv2.waitKey(0)
-
         if self.first_open_dirs_call:
             self.first_open_dirs_call = False
             return {
@@ -142,20 +152,78 @@ class MinimapSensor2(Sensor):
                 Direction.NE: False,
             }
 
-        return {dir: lengths[dir] >= 7.8 for dir in self.dirs.keys()}
+        lengths = {}
+        minimap = self.extract_minimap(frame)
+        mask = self.find_blue_mask(minimap, self.mask_colors["path"])
+
+        for dir in self.dirs_angle.keys():
+            lengths[dir] = self._test_direction(
+                mask, dir, minimap if self.debug else None
+            )
+
+        if self.debug:
+            cv2.putText(
+                minimap,
+                f"se={lengths[Direction.SE][0]:.1f},{lengths[Direction.SE][1]:.1f}, sw={lengths[Direction.SW][0]:.1f},{lengths[Direction.SW][1]:.1f}, nw={lengths[Direction.NW][0]:.1f},{lengths[Direction.NW][1]:.1f}, ne={lengths[Direction.NE][0]:.1f},{lengths[Direction.NE][1]:.1f}",
+                (10, 20),
+                0,
+                0.5,
+                (255, 255, 255),
+                1,
+            )
+            cv2.imshow("Sensor/open_dirs", minimap)
+            cv2.waitKey(1)
+
+        open_dirs = {}
+        for dir in self.dirs_angle.keys():
+            open_dirs[dir] = (8.1 < lengths[dir][0] <= 22) and (8.1 < lengths[dir][1] <= 22)
+
+        print(
+            f"se={lengths[Direction.SE][0]:.1f},{lengths[Direction.SE][1]:.1f}, sw={lengths[Direction.SW][0]:.1f},{lengths[Direction.SW][1]:.1f}, nw={lengths[Direction.NW][0]:.1f},{lengths[Direction.NW][1]:.1f}, ne={lengths[Direction.NE][0]:.1f},{lengths[Direction.NE][1]:.1f}",
+        )
+        print(open_dirs)
+        # cv2.waitKey(0)
+        return open_dirs
 
     def _test_direction(
         self,
         mask: cv2.typing.MatLike,
         dir: Direction,
         debug_minimap: cv2.typing.MatLike = None,
+    ) -> tuple[float, float]:
+        angle = self.dirs_angle[dir]  # degrees
+        self.ray_len(mask, *self.current_xy, angle, debug_minimap)
+
+        if dir == Direction.SE:
+            left_angle = angle - 19
+            right_angle = angle + 21
+        elif dir == Direction.SW:
+            left_angle = angle - 21
+            right_angle = angle + 19
+        elif dir == Direction.NW:
+            left_angle = angle - 19
+            right_angle = angle + 21
+        elif dir == Direction.NE:
+            left_angle = angle - 21
+            right_angle = angle + 19
+
+        left_length = self.ray_len(mask, *self.current_xy, left_angle, debug_minimap)
+        right_length = self.ray_len(mask, *self.current_xy, right_angle, debug_minimap)
+
+        return left_length, right_length
+
+    def ray_len(
+        self,
+        mask: cv2.typing.MatLike,
+        x: float,
+        y: float,
+        angle: float,
+        debug_minimap: cv2.typing.MatLike = None,
     ) -> float:
-        angle = self.dirs[dir]  # degrees
+        length = 0
         dx = math.cos(math.radians(angle))
         dy = math.sin(math.radians(angle))
-        x, y = self.current_xy
-        length = 0
-
+        len_sealed = False
         for _ in range(1, self.max_len + 1):
             x += dx
             y += dy
@@ -163,11 +231,17 @@ class MinimapSensor2(Sensor):
             if xi < 0 or yi < 0 or xi >= self.max_xy[0] or yi >= self.max_xy[1]:
                 break
             if mask[yi, xi] == 255:
-                length = math.hypot(x - self.current_xy[0], y - self.current_xy[1])
+                length = (
+                    math.hypot(x - self.current_xy[0], y - self.current_xy[1])
+                    if not len_sealed
+                    else length
+                )
                 if debug_minimap is not None:
                     debug_minimap[yi, xi] = (0, 255, 0)
-            elif debug_minimap is not None:
-                debug_minimap[yi, xi] = (0, 0, 255)
+            else:
+                len_sealed = True
+                if debug_minimap is not None:
+                    debug_minimap[yi, xi] = (0, 0, 255)
 
         return length
 
@@ -333,11 +407,11 @@ class MinimapSensor(Sensor):
 
 class FaSensor(Sensor):
     dir_cells = None
-    fa = True
 
     def __init__(self, frame, mask_colors, thresholds=None, debug=False):
         super().__init__(frame, mask_colors, thresholds, debug)
         self.steps = 3
+        self.fa = True
 
     def open_dirs(self, frame):
         bgr_img = extract_game(frame)
@@ -412,39 +486,82 @@ class FaSensor(Sensor):
 
 
 if __name__ == "__main__":
-    from boss.dain import BossDain
     from controller import Controller
     from devices.device import Device
 
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
-    boss = BossDain(controller, True)
 
-    frame = cv2.imread("minimap0.png")
-    sensor = MinimapSensor2(frame, boss.minimap_masks["path"], debug=True)
+    frame = device.get_frame2()
+    sensor = MinimapSensor2(
+        frame, {"path": {"l1": (85, 60, 40), "u1": (140, 255, 255)}}, debug=True
+    )
 
-    while 1:
-        # frame = maze.get_frame()
-        minimap = sensor.extract_minimap(frame)
-        blue_mask = sensor.find_blue_mask(
-            minimap, boss.minimap_masks["path"], debug=True
-        )
+    # while 1:
+    #     frame = device.get_frame2()
+    #     sensor.open_dirs(frame)
+    #     cv2.waitKey(10)
 
-        # Find the coordinates of the topmost white pixel in blue_mask
+    steps = 5
+    while steps != 0:
+        controller.move_SE()
+        sensor.move(Direction.SE)
 
-        lengths = sensor.open_dirs(blue_mask, minimap)
+        frame = device.get_frame2()
+        sensor.open_dirs(frame)
 
-        cv2.putText(
-            minimap,
-            f"sw={lengths[Direction.SW]:.0f}, nw={lengths[Direction.NW]:.0f}, se={lengths[Direction.SE]:.0f}, ne={lengths[Direction.NE]:.0f}",
-            (10, 20),
-            0,
-            0.5,
-            (255, 255, 255),
-            1,
-        )
-        cv2.imshow("frame830x690", minimap)
-        cv2.waitKey(0)
+        cv2.waitKey(70)
+        steps -= 1
 
-        sensor.move(Direction.NW)
+    cv2.waitKey(0)
+
+    steps = 12
+    while steps != 0:
+        controller.move_SW()
+        sensor.move(Direction.SW)
+
+        frame = device.get_frame2()
+        sensor.open_dirs(frame)
+
+        cv2.waitKey(70)
+        steps -= 1
+
+    cv2.waitKey(0)
+    raise Exception("stop")
+
+    steps = 26
+    while steps != 0:
+        controller.move_NE()
+        sensor.move(Direction.NE)
+
+        frame = device.get_frame2()
+        sensor.open_dirs(frame)
+
+        cv2.waitKey(70)
+        steps -= 1
+
+    cv2.waitKey(0)
+
+    steps = 30
+    while steps != 0:
+        controller.move_SW()
+        sensor.move(Direction.SW)
+
+        frame = device.get_frame2()
+        sensor.open_dirs(frame)
+
+        cv2.waitKey(70)
+        steps -= 1
+    # steps = 41
+    # while steps != 0:
+    #     controller.move_NW()
+    #     sensor.move(Direction.NW)
+
+    #     frame = device.get_frame2()
+    #     sensor.open_dirs(frame)
+
+    #     cv2.waitKey(70)
+    #     steps -= 1
+
+    cv2.waitKey(0)

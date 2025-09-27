@@ -204,7 +204,9 @@ class BotRunner:
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         boss_arg = sys.argv[1]
+        debug = False
     else:
         boss_arg = "dain"
+        debug = True
 
-    BotRunner(boss_arg).go()
+    BotRunner(boss_arg, debug).go()

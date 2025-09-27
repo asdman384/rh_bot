@@ -2,7 +2,6 @@ import logging
 import time
 
 import cv2
-import numpy as np
 
 from boss.boss import Boss
 from controller import Controller
@@ -12,11 +11,6 @@ from edges_diff import bytes_hamming, roi_edge_signature
 from frames import extract_game
 from model import Direction
 
-LOWER = np.array([95, 90, 99])
-UPPER = np.array([105, 137, 181])
-
-LOWER_1 = np.array([94, 54, 115])
-UPPER_2 = np.array([108, 102, 181])
 
 THRESHOLD_BITS = 38
 
@@ -53,17 +47,9 @@ class MazeRH:
         self.debug = debug
         self.moves = 0
         self.last_combat = 0
-        self._init_minimap_sense_dirs = True
 
     def init_camera(self) -> None:
         # Initial move to get the camera right
-        global _blue_mask
-        global _prev_p_xy
-        global _minimap_open_dirs2_initiation
-        _blue_mask = None
-        _prev_p_xy = None
-        _minimap_open_dirs2_initiation = True
-        self._init_minimap_sense_dirs = True
         self._last_frame = None
         self.boss.init_camera()
         self._is_exit = (False, None)

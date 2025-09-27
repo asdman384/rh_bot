@@ -4,12 +4,21 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "run bot script with boss",
+            "label": "Bot script with boss",
             "type": "shell",
             "command": "python",
             "args": [
                 "${workspaceFolder}/bot.py",
                 "${input:boss}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Telegram bot service",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/game_bot_service.py"
             ],
             "problemMatcher": []
         }

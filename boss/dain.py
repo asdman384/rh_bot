@@ -9,7 +9,7 @@ from controller import Controller
 from db import FA_BHALOR
 from detect_location import wait_for
 from model import Direction
-from sensor import MinimapSensor2
+from sensor import FaSensor
 
 logger = logging.getLogger(__name__)
 
@@ -61,15 +61,13 @@ class BossDain(Boss):
     def init_camera(self) -> None:
         self.controller.move_E()
         time.sleep(0.2)
-        self.sensor = MinimapSensor2(
-            self._get_frame(), self.minimap_masks, debug=self.debug
+        self.sensor = FaSensor(
+            None,
+            None,
+            {"ne": 30, "nw": 30, "se": 30, "sw": 30},
+            debug=self.debug,
         )
-
-        return
-
-        if self.minimap_sense:
-            return
-        super().init_camera()
+        self.sensor.dir_cells = FA_BHALOR
 
     def start_fight(self, dir: Direction) -> int:
         logger.debug("Fighting boss Dain...")

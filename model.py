@@ -20,6 +20,12 @@ class Direction(Enum):
     def label(self) -> str:
         return self.value[2]
 
+    def __str__(self) -> str:
+        return self.label
+
+    def __repr__(self) -> str:
+        return self.label
+
 
 ALL_DIRS: List[Direction] = [
     Direction.NE,

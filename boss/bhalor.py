@@ -8,6 +8,7 @@ from boss.boss import Boss
 from controller import Controller
 from db import FA_BHALOR
 from model import Direction
+from sensor import FaSensor
 
 
 class BossBhalor(Boss):
@@ -16,6 +17,16 @@ class BossBhalor(Boss):
         self._dist_thresh_px = 400
         self.fa_dir_cells = FA_BHALOR
         self.use_slide = False
+
+    def init_camera(self) -> None:
+        self.sensor = FaSensor(
+            None,
+            None,
+            {"ne": 30, "nw": 30, "se": 30, "sw": 30},
+            debug=self.debug,
+        )
+        self.sensor.dir_cells = FA_BHALOR
+        self.controller.move_N()
 
     def start_fight(self, dir: Direction) -> int:
         print("Fighting boss Bhalor...") if self.debug else None
