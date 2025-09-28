@@ -3,9 +3,23 @@ import time
 import cv2
 import numpy as np
 
+from boss.krokust import BossKrokust
 from detect_location import find_tpl
 from devices.device import Device
 
+device = Device("127.0.0.1", 58526)
+device.connect()
+
+# sw_combat_pos = cv2.imread("resources/krokust/ne_combat_pos.png")
+# box = None
+# while 1:
+#     box, _ = find_tpl(
+#         device.get_frame2(), sw_combat_pos, score_threshold=0.8, debug=True
+#     )
+
+#     print(box, _) if box is not None else None
+
+# raise
 # SIZE = 10
 # BUTTON_PLUS = (10, 10)
 # BUTTON_MINUS = (10, 40)
@@ -58,13 +72,12 @@ def mouse_callback(event, x_, y_, flags, param):
     print(f"x={x_}, y={y_}")
 
 
-device = Device("127.0.0.1", 58526)
-
 frame = device.get_frame2()
 cv2.imshow("frame", frame)
 cv2.setMouseCallback("frame", mouse_callback)
 cv2.waitKey(0)
 device.close()
+
 
 # i = 0
 # while 1:
@@ -75,6 +88,6 @@ device.close()
 #     cv2.waitKey(0)
 
 
-for _ in range(38):
-    device.click((x, y))
-    time.sleep(0.04)
+# for _ in range(38):
+#     device.click((x, y))
+#     time.sleep(0.04)

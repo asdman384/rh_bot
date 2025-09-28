@@ -5,7 +5,15 @@ import winsound
 
 import cv2
 
-from boss import BossBhalor, BossDain, BossDelingh, BossElvira, BossKhanel, BossMine
+from boss import (
+    BossBhalor,
+    BossDain,
+    BossDelingh,
+    BossElvira,
+    BossKhanel,
+    BossMine,
+    BossKrokust,
+)
 from bot_utils.logger_memory import LastLogsHandler
 from bot_utils.screenshoter import save_image
 from controller import Controller
@@ -24,8 +32,7 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-# logging.getLogger("boss.dain").setLevel(logging.DEBUG)
-# logging.getLogger("boss.boss").setLevel(logging.DEBUG)
+
 
 # GENERAL TODO:
 # improve combat skills CD detection
@@ -34,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 class BotRunner:
     _boss_map = {
+        "krokust": BossKrokust,
         "dain": BossDain,
         "bhalor": BossBhalor,
         "khanel": BossKhanel,
@@ -165,15 +173,12 @@ class BotRunner:
 
             self.controller.wait_loading()
             # close summary
-            if (
-                not wait_for(
-                    "resources/figth_end.png",
-                    lambda: extract_game(self.boss._get_frame()),
-                    debug=self.debug,
-                )
-                or hp != 0
+            if not wait_for(
+                "resources/figth_end.png",
+                lambda: extract_game(self.boss._get_frame()),
+                debug=self.debug,
             ):
-                logger.warning("⚠️ figth_end not found")
+                logger.warning(f"⚠️ figth_end not found, hp left: {hp}%  ")
                 if wait_failed_combat:
                     winsound.Beep(5000, 300)
                     cv2.imshow("frame", self.boss._get_frame())
@@ -223,7 +228,10 @@ if __name__ == "__main__":
         boss_arg = sys.argv[1]
         debug = False
     else:
-        boss_arg = "dain"
+        boss_arg = "krokust"
         debug = True
+        logging.getLogger("boss.dain").setLevel(logging.DEBUG)
+        logging.getLogger("boss.krokust").setLevel(logging.DEBUG)
+        logging.getLogger("boss.boss").setLevel(logging.DEBUG)
 
     BotRunner(boss_arg, debug).go(wait_failed_combat=True)

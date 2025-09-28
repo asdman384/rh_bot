@@ -199,21 +199,33 @@ class MazeRH:
 
 
 if __name__ == "__main__":
-    from boss import BossDelingh, BossDain, BossElvira, BossMine, BossKhanel, BossBhalor
+    from boss import (
+        BossDelingh,
+        BossDain,
+        BossElvira,
+        BossMine,
+        BossKhanel,
+        BossBhalor,
+        BossKrokust,
+    )
 
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
-    boss = BossDain(controller, True)
+    boss = BossKrokust(controller, True)
     maze = MazeRH(controller, boss, True)
-    boss.init_camera()
+    # boss.init_camera()
+
+    # boss.start_fight(Direction.SW)
+    # raise
     # # TEST is_near_exit
     while 1:
         # maze.sense()
         frame830x690 = extract_game(maze.get_frame())
         frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
         res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
-        print(res, _)
+        _enemies = maze._count_enemies(frame830x690hsv, frame830x690)
+        print(res, _, _enemies)
 
     # # TEST is_near_exit thresolds
     # frame = extract_game(device.get_frame2())

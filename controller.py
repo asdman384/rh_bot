@@ -82,9 +82,9 @@ class Controller:
         self._tap(self.skill_3_point if p is None else p)
 
     def skill_4(self, p: cv2.typing.Point | None = None):
-        self._tap(self.skill_4_point)
+        self.click(self.skill_4_point)
         time.sleep(0.1)
-        self._tap(self.skill_4_point if p is None else p)
+        self.click(self.skill_4_point if p is None else p)
 
     def _tap(self, xy: cv2.typing.Point):
         if self.use_click:
@@ -105,11 +105,9 @@ class Controller:
     def confirm(self):
         return self._tap((740, 530))
 
-    def attack(self):
-        res = self.device.device.shell("input tap 1100 450")
-        # time.sleep(0.6) # bhalor
-        time.sleep(0.2)  # khanel
-        return res
+    def attack(self) -> None:
+        self.device.device.shell("input tap 1100 450", decode=False)
+        time.sleep(0.2)
 
     def wait_loading(self, wait_appearance=0.5, timeout=1):
         wait_loading(

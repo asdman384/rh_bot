@@ -25,55 +25,18 @@ def extract_boss_health(frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
 def measure_fill_px(roi: cv2.typing.MatLike, debug=False) -> float:
     H, W = roi.shape[:2]
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-
-    mask = cv2.inRange(
-        hsv,
-        np.array([20, 90, 200], dtype=np.uint8),
-        np.array([23, 118, 255], dtype=np.uint8),
-    )
-
-    # cv2.imshow("mask", mask)
-    # cv2.waitKey(0)
-
-    # ys, xs = np.where(mask > 0)
-
-    # if len(xs) == 0 or len(ys) == 0:
-    #     x, y, w, h = 0, 0, 0, 0
-    # else:
-    #     x, y = xs.min(), ys.min()
-    #     w, h = xs.max() - xs.min() + 1, ys.max() - ys.min() + 1
-
-    cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    # Пороговые размеры
-    min_h = 9
-    max_h = 11
-    min_w = 2
-    max_w = 4
-
-    if not cnts or len(cnts) == 0:
-        return 0.0
-
-    bx = None
-    area = None
-    for c in cnts:
-        x, y, w, h = cv2.boundingRect(c)
-
-        if h < min_h or h > max_h:
-            continue
-        if w < min_w or w > max_w:
-            continue
-        if h / max(w, 1) < 2:  # вытянутость по вертикали
-            continue
-        area = cv2.contourArea(c)
-        if area / (w * h) < 0.2:  # отсекаем «рваные» и рамки
-            continue
-
-        bx = x + 2
+    mask = cv2.inRange(hsv, (170, 150, 100), (180, 255, 210))
+    
+    bx = 0
+    for x in range(W):
+        col = mask[:, x]
+        if cv2.countNonZero(col) > H // 2:
+            bx = x
 
     if debug:
         cv2.putText(
             roi,
-            f"bx={bx}, w={W}, area={area}, w={w} h={h}",
+            f"bx={bx}, W={W}, HP={bx / W * 100:.1f}%",
             (10, 8),
             0,
             0.4,
@@ -83,21 +46,13 @@ def measure_fill_px(roi: cv2.typing.MatLike, debug=False) -> float:
         deb = np.vstack((roi, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)))
         cv2.imshow("DBG/measure_fill_px", deb)
         cv2.waitKey(1)
-        # save_image(
-        #     deb,
-        #     "images\\measure_fill_px\\fail_m" + time.strftime("%H-%M-%S") + ".png",
-        # )
 
-    if bx is None:
-        return 0.0
-
-    return bx / W * 100
+    return int(round(bx / W * 100))
 
 
 class Boss(ABC):
     sensor: Sensor | None = None
     minimap_masks = None
-    fa_dir_cells: dict[str, np.ndarray]
     fa_dir_threshold = {
         "ne": 18,
         "nw": 18,

@@ -26,14 +26,18 @@ class BossDain(Boss):
         super().__init__(controller, debug)
 
         self.max_moves = 100
-        self.fa_dir_cells = FA_BHALOR
         self.enter_room_clicks = 10
         self.no_combat_minions = True
         self.exit_check_type = "tpl"  # 'mask' | 'tpl'
         self.exit_tpl_sw_threshold = 0.57
         self.exit_tpl_sw = cv2.imread("resources/dain/sw.png")
         self.exit_tpl_ne = cv2.imread("resources/dain/ne.png")
-
+        self.fa_dir_threshold = {
+            "ne": 30,
+            "nw": 30,
+            "se": 30,
+            "sw": 30,
+        }
         self.ensure_movement = False
 
         self.minimap_masks = {
@@ -64,7 +68,7 @@ class BossDain(Boss):
         self.sensor = FaSensor(
             None,
             None,
-            {"ne": 30, "nw": 30, "se": 30, "sw": 30},
+            self.fa_dir_threshold,
             debug=self.debug,
         )
         self.sensor.dir_cells = FA_BHALOR
@@ -109,8 +113,10 @@ class BossDain(Boss):
         return hp
 
     def open_chest(self, dir: Direction) -> bool:
-        None if dir == Direction.SW else self.controller.move_NE()
-        time.sleep(0.2) if dir == Direction.NE else None
+        if dir == Direction.NE:
+            self.controller.move_NE()
+            time.sleep(0.2)
+
         self.controller.skill_4()
         t0 = time.time()
         time.sleep(1.6)
