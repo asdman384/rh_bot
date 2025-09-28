@@ -56,11 +56,10 @@ class BossMine(Boss):
         self.sensor = MinimapSensor(
             None,
             self.minimap_masks,
-            {"ne": 40, "nw": 40, "se": 40, "sw": 40},
+            {"ne": 35, "nw": 35, "se": 35, "sw": 35},
             debug=self.debug,
         )
-        self.controller.move_SE()
-        self.controller.move_NW()
+        self.controller.move_E()
 
     def count_enemies(self, frame830x690: cv2.typing.MatLike) -> int:
         px, py = 830 // 2, 690 // 2
@@ -165,7 +164,7 @@ class BossMine(Boss):
         self.controller.move_SW()
         return True
 
-    def tavern_Route(self) -> None:
+    def tavern_Route(self) -> bool:
         if self.map_xy is None:
             print("go Inventory")
             self.controller._tap((880, 620))  # Inventory button
@@ -202,6 +201,8 @@ class BossMine(Boss):
         if not wait_for("resources/mine.png", self._get_frame, 5, 0.34):
             print("mine not active")
 
+        return True
+
     def _mouse_callback(self, event, x, y, flags, param):
         if event != cv2.EVENT_LBUTTONDOWN:
             return
@@ -226,6 +227,7 @@ class BossMine(Boss):
         if not wait_for("resources/move_mine.png", self._get_frame):
             raise "Mine enter problem"
         self.controller.wait_loading(0.5)
+        time.sleep(0.5)
         self.controller.back()
         time.sleep(0.1)
 

@@ -95,6 +95,9 @@ class GameBotService:
             "📊 Статус бота:\n\n"
             f"Бот активен: {self.game_bot_thread and self.game_bot_thread.is_alive()}\n"
             f"tg Обработчиков: {len(self.bot.application.handlers[0])}"
+            f"\nRuns per hour: {self.bot_runner.get_runs_per_hour() if self.bot_runner else 0:.2f}"
+            f"\nTotal runs: {self.bot_runner.run if self.bot_runner else 0}"
+            f"\nFailed runs: {self.bot_runner.failed_runs if self.bot_runner else 0}"
         )
         await update.message.reply_text(status_message)
 
@@ -287,6 +290,9 @@ class GameBotService:
             "📊 Статус бота:\n\n"
             f"Бот активен: {self.game_bot_thread and self.game_bot_thread.is_alive()}\n"
             f"tg Обработчиков: {len(self.bot.application.handlers[0])}"
+            f"\nRuns per hour: {self.bot_runner.get_runs_per_hour() if self.bot_runner else 0:.2f}"
+            f"\nTotal runs: {self.bot_runner.run if self.bot_runner else 0}"
+            f"\nFailed runs: {self.bot_runner.failed_runs if self.bot_runner else 0}"
         )
         await update.message.reply_text(status_message)
 

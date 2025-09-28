@@ -12,7 +12,7 @@ from frames import extract_game
 from model import Direction
 
 
-THRESHOLD_BITS = 38
+THRESHOLD_BITS = 31
 
 logger = logging.getLogger(__name__)
 
@@ -76,13 +76,11 @@ class MazeRH:
             move()
             self.boss.sensor.move(d)
 
-            if self.boss.sensor.fa and _ != 2:
+            if _ != self.boss.sensor.steps - 1:
                 frame830x690 = extract_game(self.get_frame())
                 frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
                 self._enemies = self._count_enemies(frame830x690hsv, frame830x690)
                 self._is_exit = self.boss.is_near_exit(frame830x690hsv, frame830x690)
-            else:
-                time.sleep(0.02)
 
             if self._is_exit[0] and self._enemies == 0:
                 return True
@@ -201,14 +199,14 @@ class MazeRH:
 
 
 if __name__ == "__main__":
-    from boss import BossDelingh, BossDain, BossElvira
+    from boss import BossDelingh, BossDain, BossElvira, BossMine, BossKhanel, BossBhalor
 
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
-    boss = BossElvira(controller, True)
+    boss = BossDain(controller, True)
     maze = MazeRH(controller, boss, True)
-    # maze.init_camera()
+    boss.init_camera()
     # # TEST is_near_exit
     while 1:
         # maze.sense()

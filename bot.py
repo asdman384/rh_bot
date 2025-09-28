@@ -51,6 +51,8 @@ class BotRunner:
             raise ValueError(f"Unknown boss type: {boss_type}")
 
         self.run = 1
+        self.failed_runs = 0
+        self.time_start = time.time()
         self.debug = debug
         self.controller = Controller(
             Device("127.0.0.1", 58526).connect(),
@@ -81,7 +83,14 @@ class BotRunner:
             self.controller._tap((1055, 320))  # hit the enter button
             time.sleep(3)
 
-    def go(self):
+    def get_runs_per_hour(self):
+        elapsed_time = time.time() - self.time_start
+        if elapsed_time == 0:
+            return 0
+        runs_per_hour = (self.run / elapsed_time) * 3600
+        return runs_per_hour
+
+    def go(self, wait_failed_combat=False):
         # ---------------------- Main loop --------------------------
         current_run = 1
         while current_run < 45:
@@ -91,7 +100,7 @@ class BotRunner:
             self.check_town()
 
             # flush bag and back to main map
-            if type(self.boss) is not BossMine and current_run % 30 == 0:  # every N run
+            if type(self.boss) is not BossMine and current_run % 35 == 0:  # every N run
                 self.boss.back()
                 self.controller.flush_bag(decompose=True)
                 self.controller.full_back()
@@ -120,6 +129,7 @@ class BotRunner:
                     winsound.Beep(2000, 50)
                     raise
                 self.boss.back()
+                self.failed_runs += 1
                 continue
 
             # enter boss gate
@@ -144,6 +154,7 @@ class BotRunner:
                     winsound.Beep(2000, 50)
                     raise
                 self.boss.back()
+                self.failed_runs += 1
                 continue
 
             self.controller.yes()
@@ -163,8 +174,11 @@ class BotRunner:
                 or hp != 0
             ):
                 logger.warning("⚠️ figth_end not found")
-                winsound.Beep(5000, 300)
-                time.sleep(60)
+                if wait_failed_combat:
+                    winsound.Beep(5000, 300)
+                    cv2.imshow("frame", self.boss._get_frame())
+                    cv2.waitKey(0)
+                    cv2.destroyAllWindows()
 
             self.controller.wait_loading(0.5)
             self.controller.yes()
@@ -173,8 +187,11 @@ class BotRunner:
             # open chest
             if not self.boss.open_chest(dir) and type(self.boss) is BossDain:
                 logger.warning("⚠️ open chest fail")
-                winsound.Beep(5000, 300)
-                time.sleep(30)
+                if wait_failed_combat:
+                    winsound.Beep(5000, 300)
+                    cv2.imshow("frame", self.boss._get_frame())
+                    cv2.waitKey(0)
+                    cv2.destroyAllWindows()
 
             if moves is not None and moves > 130:
                 save_image(
@@ -209,4 +226,4 @@ if __name__ == "__main__":
         boss_arg = "dain"
         debug = True
 
-    BotRunner(boss_arg, debug).go()
+    BotRunner(boss_arg, debug).go(wait_failed_combat=True)

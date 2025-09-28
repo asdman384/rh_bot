@@ -32,8 +32,10 @@ class Sensor(ABC):
         self.thresholds = thresholds
         self.steps = 1
         self.fa = False
+        self.moves = 0
 
     def move(self, dir: Direction) -> tuple[float, float]:
+        self.moves += 1
         return 0.0, 0.0
 
     @abstractmethod
@@ -89,7 +91,6 @@ class Sensor(ABC):
 class MinimapSensor2(Sensor):
     max_len = 20
     step = 3.33
-    moves = 0
 
     dirs_angle = {
         Direction.SE: 35.5,
@@ -176,7 +177,9 @@ class MinimapSensor2(Sensor):
 
         open_dirs = {}
         for dir in self.dirs_angle.keys():
-            open_dirs[dir] = (8.1 < lengths[dir][0] <= 22) and (8.1 < lengths[dir][1] <= 22)
+            open_dirs[dir] = (8.1 < lengths[dir][0] <= 22) and (
+                8.1 < lengths[dir][1] <= 22
+            )
 
         print(
             f"se={lengths[Direction.SE][0]:.1f},{lengths[Direction.SE][1]:.1f}, sw={lengths[Direction.SW][0]:.1f},{lengths[Direction.SW][1]:.1f}, nw={lengths[Direction.NW][0]:.1f},{lengths[Direction.NW][1]:.1f}, ne={lengths[Direction.NE][0]:.1f},{lengths[Direction.NE][1]:.1f}",
@@ -248,11 +251,19 @@ class MinimapSensor2(Sensor):
 
 class MinimapSensor(Sensor):
     def __init__(self, frame, mask_colors, thresholds=None, minimap=None, debug=False):
-        super().__init__(frame, mask_colors, thresholds, minimap, debug)
+        super().__init__(frame, mask_colors, thresholds, debug)
         self._prev_p_xy = None
         self.steps = 2
 
     def open_dirs(self, frame: cv2.typing.MatLike):
+        if self.moves == 0:
+            return {
+                Direction.NW: False,
+                Direction.SE: True,
+                Direction.SW: False,
+                Direction.NE: False,
+            }
+
         minimap = self.extract_minimap(frame)
         hsv = cv2.cvtColor(minimap, cv2.COLOR_BGR2HSV)
         pm = self.player_mask(hsv, self.mask_colors["player"])
@@ -284,14 +295,14 @@ class MinimapSensor(Sensor):
             nw = self.check_rect(lab, p_xy, self._prev_p_xy, offset["NW"], NW_RECT)
             se = self.check_rect(lab, p_xy, self._prev_p_xy, offset["SE"], SE_RECT)
             sw = self.check_rect(lab, p_xy, self._prev_p_xy, offset["SW"], SW_RECT)
-            cv2.circle(frame, p_xy, 1, (255, 255, 255), 1)
+            cv2.circle(minimap, p_xy, 1, (255, 255, 255), 1)
 
         if p_xy is not None:
             self._prev_p_xy = p_xy
 
         if self.debug:
             self.draw_rect(
-                frame,
+                minimap,
                 p_xy,
                 self._prev_p_xy,
                 offset["NE"],
@@ -299,7 +310,7 @@ class MinimapSensor(Sensor):
                 (0, 255, 0) if ne > self.thresholds["ne"] else (0, 0, 255),
             )
             self.draw_rect(
-                frame,
+                minimap,
                 p_xy,
                 self._prev_p_xy,
                 offset["SW"],
@@ -307,7 +318,7 @@ class MinimapSensor(Sensor):
                 (0, 255, 0) if sw > self.thresholds["sw"] else (0, 0, 255),
             )
             self.draw_rect(
-                frame,
+                minimap,
                 p_xy,
                 self._prev_p_xy,
                 offset["NW"],
@@ -315,14 +326,14 @@ class MinimapSensor(Sensor):
                 (0, 255, 0) if nw > self.thresholds["nw"] else (0, 0, 255),
             )
             self.draw_rect(
-                frame,
+                minimap,
                 p_xy,
                 self._prev_p_xy,
                 offset["SE"],
                 SE_RECT,
                 (0, 255, 0) if se > self.thresholds["se"] else (0, 0, 255),
             )
-            cv2.imshow("minimap/frame", frame)
+            cv2.imshow("minimap/minimap", minimap)
             cv2.imshow("minimap/pm", pm)
             cv2.putText(
                 lab,
