@@ -12,32 +12,43 @@ from model import Direction
 from sensor import Sensor
 
 logger = logging.getLogger(__name__)
+hp_bar_tpl = cv2.imread("resources/hp_bar.png")
 
 
 def extract_boss_health(frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
-    X = 408
+    X = 398
     Y = 133
-    W = 460
+    W = 480
     H = 10
     return cv2.resize(frame[Y : Y + H, X : X + W], (W, H))
 
 
 def measure_fill_px(roi: cv2.typing.MatLike, debug=False) -> float:
     H, W = roi.shape[:2]
+
+    box, _ = find_tpl(roi, hp_bar_tpl, score_threshold=0.86, debug=debug)
+    if box is None:
+        return 0
+
+    roi = cv2.resize(roi[0 : 0 + H, 10 : 10 + 460], (460, H))
+    H, W = roi.shape[:2]
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, (170, 150, 100), (180, 255, 210))
-    
+
     bx = 0
     for x in range(W):
         col = mask[:, x]
         if cv2.countNonZero(col) > H // 2:
             bx = x
 
+    bx += 5  # +5 to be sure
+    bx = W if bx > W else bx
+
     if debug:
         cv2.putText(
             roi,
             f"bx={bx}, W={W}, HP={bx / W * 100:.1f}%",
-            (10, 8),
+            (10, 9),
             0,
             0.4,
             (0, 255, 0),

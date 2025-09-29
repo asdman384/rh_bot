@@ -70,10 +70,21 @@ class BotRunner:
         self.explorer = Explorer(
             MazeRH(self.controller, self.boss, debug),
         )
-        logger.info(f"Initialized bot for boss: {boss_type}")
+        logger.info(f"Initialized bot for boss: {boss_type}, debug={debug}")
 
         self.last_logs_handler = LastLogsHandler(30)
         logger.addHandler(self.last_logs_handler)
+        if debug:
+            logger.setLevel(logging.DEBUG)
+            logging.getLogger("detect_location").setLevel(logging.DEBUG)
+            logging.getLogger("detect_boss_room").setLevel(logging.DEBUG)
+            logging.getLogger("controller").setLevel(logging.DEBUG)
+            logging.getLogger("devices.device").setLevel(logging.DEBUG)
+            logging.getLogger("explorer").setLevel(logging.DEBUG)
+            logging.getLogger("maze_rh").setLevel(logging.DEBUG)
+            logging.getLogger("boss.dain").setLevel(logging.DEBUG)
+            logging.getLogger("boss.krokust").setLevel(logging.DEBUG)
+            logging.getLogger("boss.boss").setLevel(logging.DEBUG)
 
     def check_main_map(self):
         monetia = cv2.imread("resources/monetia.png", cv2.IMREAD_COLOR)
@@ -178,6 +189,10 @@ class BotRunner:
                 lambda: extract_game(self.boss._get_frame()),
                 debug=self.debug,
             ):
+                save_image(
+                    self.boss._get_frame(),
+                    f"fails/figth_end_{time.strftime('%H-%M-%S')}.png",
+                )
                 logger.warning(f"⚠️ figth_end not found, hp left: {hp}%  ")
                 if wait_failed_combat:
                     winsound.Beep(5000, 300)
@@ -228,10 +243,7 @@ if __name__ == "__main__":
         boss_arg = sys.argv[1]
         debug = False
     else:
-        boss_arg = "krokust"
+        boss_arg = "dain"
         debug = True
-        logging.getLogger("boss.dain").setLevel(logging.DEBUG)
-        logging.getLogger("boss.krokust").setLevel(logging.DEBUG)
-        logging.getLogger("boss.boss").setLevel(logging.DEBUG)
 
     BotRunner(boss_arg, debug).go(wait_failed_combat=True)
