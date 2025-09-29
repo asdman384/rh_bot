@@ -4,7 +4,7 @@ import time
 
 import cv2
 
-from boss.boss import Boss
+from boss.boss import Boss, extract_boss_health, measure_fill_px
 from controller import Controller
 from db import FA_BHALOR
 from detect_location import wait_for
@@ -99,7 +99,7 @@ class BossDain(Boss):
         routine = ne_routine if dir == Direction.NE else sw_routine
         hp, prev_hp = 100, 100
         while hp > 0 and len(routine) > 0:
-            phase_change = prev_hp > 50 and hp < 50
+            phase_change = prev_hp > 50 and hp <= 50.5
             logger.debug(f"steps left: {len(routine)} phase_change: {phase_change}")
             time.sleep(1.4) if phase_change else None
             if len(routine) == 1:
@@ -109,6 +109,14 @@ class BossDain(Boss):
             prev_hp = hp
             hp = routine.pop()()
 
+        if 0 < hp < 4:
+            logger.debug(f"Finishing with basic attack... {hp}% left")
+            time.sleep(1)
+            self.controller.attack()
+            time.sleep(1)
+            hp = measure_fill_px(extract_boss_health(self._get_frame()), self.debug)
+            logger.debug(f"Finished with basic attack... {hp}% left")
+
         logger.debug("Finished boss Dain...")
         return hp
 
@@ -117,7 +125,7 @@ class BossDain(Boss):
             self.controller.move_NE()
             time.sleep(0.2)
 
-        self.controller.skill_4()
+        self.controller.skill_4((590, 390) if dir == Direction.SW else None)
         t0 = time.time()
         time.sleep(1.6)
         chest = f"resources/dain/{Direction.SW.label.lower()}_chest.png"

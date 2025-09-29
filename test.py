@@ -11,10 +11,10 @@ from devices.device import Device
 device = Device("127.0.0.1", 58526)
 device.connect()
 
-while 1:
-    hp = measure_fill_px(extract_boss_health(device.get_frame2()), debug=True)
-    print(f"Boss health: {hp} %")
-    cv2.waitKey(10)
+# while 1:
+#     hp = measure_fill_px(extract_boss_health(device.get_frame2()), debug=True)
+#     print(f"Boss health: {hp} %")
+#     cv2.waitKey(10)
 
 # sw_combat_pos = cv2.imread("resources/krokust/ne_combat_pos.png")
 # box = None
@@ -25,7 +25,7 @@ while 1:
 
 #     print(box, _) if box is not None else None
 
-raise
+# raise
 # SIZE = 10
 # BUTTON_PLUS = (10, 10)
 # BUTTON_MINUS = (10, 40)

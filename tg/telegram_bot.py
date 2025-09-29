@@ -5,7 +5,7 @@ from typing import Optional, List
 
 import cv2
 import numpy as np
-from telegram import InlineKeyboardMarkup, Update, BotCommand
+from telegram import Update, BotCommand
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -24,9 +24,6 @@ logging.getLogger("apscheduler.jobstores.default").setLevel(logging.WARNING)
 logging.getLogger("apscheduler.job").setLevel(logging.WARNING)
 logging.getLogger("_client").setLevel(logging.WARNING)
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.WARNING
-)
 logger = logging.getLogger(__name__)
 
 
@@ -38,25 +35,35 @@ class TelegramBot:
         "/help - показать справку\n\n",
     ]
 
-    keyboard = InlineKeyboardMarkup([])
-
     def __init__(self, token: str, admin_users: List[int] = None):
         self.token = token
         self.admin_users = admin_users or []
         self.application = Application.builder().token(token).build()
         # Optional: list of BotCommand to expose in Telegram's input menu
         self._commands: List[BotCommand] | None = None
+        # Pre-computed filter for admin users (if any provided)
+        self._admin_filter = (
+            filters.User(self.admin_users) if self.admin_users else None
+        )
         self._setup_handlers()
 
     def _setup_handlers(self):
         self.add_command_handler("start", self.start_command)
         self.add_command_handler("help", self.start_command)
         self.add_command_handler("ping", self.ping_command)
-
-        # Add text message handler
-        self.application.add_handler(
-            MessageHandler(filters.TEXT & ~filters.COMMAND, self.echo_handler)
-        )
+        # Text message handler (echo) only for admins if admin list provided
+        if self._admin_filter:
+            self.application.add_handler(
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND & self._admin_filter,
+                    self.echo_handler,
+                )
+            )
+        else:
+            # No admin list configured -> allow everyone
+            self.application.add_handler(
+                MessageHandler(filters.TEXT & ~filters.COMMAND, self.echo_handler)
+            )
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("".join(self.welcome_message))
@@ -65,31 +72,6 @@ class TelegramBot:
         """Обработчик текстовых сообщений (эхо)"""
         user_text = update.message.text
         await update.message.reply_text(f"🔊 Эхо: {user_text}")
-
-    async def send_screenshot(
-        self, image: np.ndarray, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        """Обработчик команды /screenshot"""
-        try:
-            if image is None:
-                await update.message.reply_text("❌ Нет доступного скриншота")
-                return
-
-            # Конвертируем np.ndarray в изображение для отправки
-            image_bytes = self._convert_np_to_bytes(image)
-
-            if image_bytes is None:
-                await update.message.reply_text("❌ Ошибка при обработке изображения")
-                return
-
-            # Отправляем изображение
-            await update.message.reply_photo(
-                photo=image_bytes, caption="📸 Текущий скриншот"
-            )
-
-        except Exception as e:
-            logger.error(f"Ошибка при отправке скриншота: {e}")
-            await update.message.reply_text(f"❌ Ошибка: {str(e)}")
 
     async def ping_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /ping"""
@@ -121,7 +103,13 @@ class TelegramBot:
             return None
 
     def add_command_handler(self, command: str, handler_func):
-        self.application.add_handler(CommandHandler(command, handler_func))
+        # Apply admin filter if configured
+        if self._admin_filter:
+            self.application.add_handler(
+                CommandHandler(command, handler_func, filters=self._admin_filter)
+            )
+        else:
+            self.application.add_handler(CommandHandler(command, handler_func))
         logger.warning(f"Добавлен обработчик для команды: /{command}")
 
     def set_command_list(self, commands: List[tuple[str, str]]):

@@ -1,11 +1,18 @@
 import asyncio
+import logging
 import time
 
 from threading import Thread
 from typing import Optional
 
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InputMediaPhoto,
+    Update,
+    ReplyKeyboardMarkup,
+)
+from telegram.ext import CallbackQueryHandler, ContextTypes
 
 from bot import BotRunner
 from devices.device import Device
@@ -13,9 +20,16 @@ from devices.wincap import click_in_window, find_window_by_title, screenshot_win
 from tg.bot_config import BotConfig
 from tg.telegram_bot import TelegramBot
 
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.WARNING
+)
+logger = logging.getLogger(__name__)
+
 
 class GameBotService:
     """Сервис для интеграции бота с захватом скриншотов"""
+
+    REFRESH_CALLBACK = "refresh_screenshot"
 
     def __init__(
         self,
@@ -33,33 +47,35 @@ class GameBotService:
 
         # Добавляем дополнительные команды
         self.bot.add_command_handler("screenshot", self._screenshot_command)
-        self.bot.add_command_handler("window", self._window_info_command)
-        self.bot.add_command_handler("status", self.status_command)
         self.bot.add_command_handler("start_game", self._start_game)
         self.bot.add_command_handler("close_game", self._close_game)
         self.bot.add_command_handler("start_game_bot", self.start)
         self.bot.add_command_handler("stop_game_bot", self.stop)
         self.bot.add_command_handler("click", self.click)
         self.bot.add_command_handler("logs", self.logs_command)
+        # Callback for refreshing screenshot
+        self.bot.application.add_handler(
+            CallbackQueryHandler(
+                self.refresh_screenshot_callback,
+                pattern=f"^{self.REFRESH_CALLBACK}$",
+            )
+        )
+
         # Зарегистрировать список команд для меню Telegram
         self.bot.set_command_list(
             [
                 ("screenshot", "📷"),
-                ("window", "🪟"),
+                ("logs", "📝"),
                 ("start_game", "🗡️"),
                 ("click", "🖱️/click x y"),
                 ("start_game_bot", "🤖"),
-                ("status", "📊"),
-                ("close_game", "❌"),
                 ("help", "ℹ️"),
                 ("ping", "📶"),
                 ("stop_game_bot", "🛑(don't work)"),
-                ("logs", "📝"),
+                ("close_game", "❌"),
             ]
         )
         self.bot.welcome_message.append("/screenshot - получить текущий скриншот\n\n")
-        self.bot.welcome_message.append("/window - получить информацию об окне\n\n")
-        self.bot.welcome_message.append("/status - показать статус бота\n\n")
         self.bot.welcome_message.append("/start_game - запустить игру\n\n")
         self.bot.welcome_message.append("/close_game - закрыть игру\n\n")
         self.bot.welcome_message.append("/start_game_bot - запустить игровой бот\n\n")
@@ -88,18 +104,6 @@ class GameBotService:
 
         click_in_window(self.hwnd, x, y, button="left", double=False)
         await update.message.reply_text(f"✅ Кликнуто в координаты ({x}, {y})")
-
-    async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /status"""
-        status_message = (
-            "📊 Статус бота:\n\n"
-            f"Бот активен: {self.game_bot_thread and self.game_bot_thread.is_alive()}\n"
-            f"tg Обработчиков: {len(self.bot.application.handlers[0])}"
-            f"\nRuns per hour: {self.bot_runner.get_runs_per_hour() if self.bot_runner else 0:.2f}"
-            f"\nTotal runs: {self.bot_runner.run if self.bot_runner else 0}"
-            f"\nFailed runs: {self.bot_runner.failed_runs if self.bot_runner else 0}"
-        )
-        await update.message.reply_text(status_message)
 
     async def _start_game(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if self._find_window():
@@ -136,29 +140,71 @@ class GameBotService:
 
     async def _screenshot_command(self, update: Update, context):
         try:
+            self._find_window()
             if not self.hwnd:
                 await update.message.reply_text("❌ Окно не найдено")
                 return
 
             frame = screenshot_window_np(self.hwnd, client_only=True)
-            await self.bot.send_screenshot(frame, update, context)
+
+            if frame is None:
+                await update.message.reply_text("❌ Нет доступного скриншота")
+                return
+
+            image_bytes = self.bot._convert_np_to_bytes(frame)
+            if image_bytes is None:
+                await update.message.reply_text("❌ Ошибка при обработке изображения")
+                return
+
+            button = InlineKeyboardButton(
+                text="🔄 refresh", callback_data=self.REFRESH_CALLBACK
+            )
+            keyboard = InlineKeyboardMarkup([[button]])
+
+            await update.message.reply_photo(
+                image_bytes, self._get_caption(), reply_markup=keyboard
+            )
 
         except Exception as e:
-            await update.message.reply_text(f"❌ Ошибка захвата: {str(e)}")
-
-    async def _window_info_command(self, update: Update, context):
-        """Информация о целевом окне"""
-        try:
-            self._find_window()
-            if self.hwnd:
-                message = f"🪟 Окно найдено: {self.window_title}\nHWND: {self.hwnd}"
-            else:
-                message = f"❌ Окно '{self.window_title}' не найдено"
-
-            await update.message.reply_text(message)
-
-        except Exception as e:
+            logger.error(f"Ошибка при отправке скриншота: {e}")
             await update.message.reply_text(f"❌ Ошибка: {str(e)}")
+
+    async def refresh_screenshot_callback(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        """Обрабатывает нажатие кнопки обновления: редактирует сообщение новым скриншотом."""
+        query = update.callback_query
+        if query is None:
+            return
+        await query.answer()
+
+        try:
+            frame = screenshot_window_np(self.hwnd, client_only=True)
+
+            if frame is None:
+                await update.message.reply_text("❌ Нет доступного скриншота")
+                return
+
+            image_bytes = self.bot._convert_np_to_bytes(frame)
+            if image_bytes is None:
+                await update.message.reply_text("❌ Ошибка при обработке изображения")
+                return
+
+            button = InlineKeyboardButton(
+                text="🔄 refresh", callback_data=self.REFRESH_CALLBACK
+            )
+            keyboard = InlineKeyboardMarkup([[button]])
+
+            await query.message.edit_media(
+                media=InputMediaPhoto(image_bytes, self._get_caption()),
+                reply_markup=keyboard,
+            )
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении скриншота: {e}")
+            try:
+                await query.answer(text=f"Ошибка: {e}", show_alert=True)
+            except Exception:
+                pass
 
     def _find_window(self):
         """Поиск целевого окна"""
@@ -170,6 +216,16 @@ class GameBotService:
             print(f"❌ Окно не найдено: {e}")
             self.hwnd = None
             return False
+
+    def _get_caption(self):
+        is_active = self.game_bot_thread and self.game_bot_thread.is_alive()
+        return (
+            f"📊 {time.strftime('%H:%M:%S')} Status: game bot:{'🟢' if is_active else '🔴'} tg handlers: {len(self.bot.application.handlers[0])}\n"
+            f"\nTotal time: {self.bot_runner.get_total_time() if self.bot_runner else '00:00:00'}"
+            f"      Total runs: {self.bot_runner.run if self.bot_runner else 0}"
+            f"\nRuns per hour: {self.bot_runner.get_runs_per_hour() if self.bot_runner else 0:.2f}"
+            f"       Failed runs: {self.bot_runner.failed_runs if self.bot_runner else 0}"
+        )
 
     def _game_bot_worker(self):
         if self._selected_boss is None:
@@ -286,15 +342,7 @@ class GameBotService:
         self.game_bot_thread = Thread(target=self._game_bot_worker, daemon=True)
         self.game_bot_thread.start()
 
-        status_message = (
-            "📊 Статус бота:\n\n"
-            f"Бот активен: {self.game_bot_thread and self.game_bot_thread.is_alive()}\n"
-            f"tg Обработчиков: {len(self.bot.application.handlers[0])}"
-            f"\nRuns per hour: {self.bot_runner.get_runs_per_hour() if self.bot_runner else 0:.2f}"
-            f"\nTotal runs: {self.bot_runner.run if self.bot_runner else 0}"
-            f"\nFailed runs: {self.bot_runner.failed_runs if self.bot_runner else 0}"
-        )
-        await update.message.reply_text(status_message)
+        await update.message.reply_text(self._get_caption())
 
     async def stop(
         self,

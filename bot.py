@@ -105,9 +105,16 @@ class BotRunner:
     def get_runs_per_hour(self):
         elapsed_time = time.time() - self.time_start
         if elapsed_time == 0:
-            return 0
+            return 0.0
         runs_per_hour = (self.run / elapsed_time) * 3600
         return runs_per_hour
+
+    def get_total_time(self):
+        elapsed_time = time.time() - self.time_start
+        hours = int(elapsed_time // 3600)
+        minutes = int((elapsed_time % 3600) // 60)
+        seconds = int(elapsed_time % 60)
+        return f"{hours:02}:{minutes:02}:{seconds:02}"
 
     def go(self, wait_failed_combat=False):
         # ---------------------- Main loop --------------------------
@@ -119,7 +126,7 @@ class BotRunner:
             self.check_town()
 
             # flush bag and back to main map
-            if type(self.boss) is not BossMine and current_run % 35 == 0:  # every N run
+            if current_run % 35 == 0 and type(self.boss) is not BossMine:  # every N run
                 self.boss.back()
                 self.controller.flush_bag(decompose=True)
                 self.controller.full_back()
