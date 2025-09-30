@@ -45,6 +45,8 @@ class TelegramBot:
         self._admin_filter = (
             filters.User(self.admin_users) if self.admin_users else None
         )
+        # Event loop reference (set on run). Needed for cross-thread notifications.
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._setup_handlers()
 
     def _setup_handlers(self):
@@ -132,9 +134,39 @@ class TelegramBot:
                     f"Ошибка отправки сообщения администратору {admin_id}: {e}"
                 )
 
+    def notify_admins_threadsafe(self, message: str):
+        """Thread-safe wrapper to call notify_admins from non-async threads.
+
+        If the bot has already started (loop stored) we schedule the coroutine
+        with run_coroutine_threadsafe. If not yet started we fall back to
+        creating a temporary event loop to send messages synchronously (best-effort).
+        """
+
+        async def _coro():
+            await self.notify_admins(message)
+
+        if self._loop and self._loop.is_running():
+            try:
+                asyncio.run_coroutine_threadsafe(_coro(), self._loop)
+            except Exception as e:
+                logger.error(f"notify_admins_threadsafe scheduling failed: {e}")
+        else:
+            # Fallback (should rarely happen): run in a new loop (blocks caller)
+            try:
+                asyncio.run(_coro())
+            except RuntimeError:
+                # If already in an event loop (unlikely in thread) create new loop
+                loop = asyncio.new_event_loop()
+                try:
+                    loop.run_until_complete(_coro())
+                finally:
+                    loop.close()
+
     async def run(self):
         """Запуск бота"""
         logger.warning("Запуск Telegram бота...")
+        # Store loop for cross-thread callbacks
+        self._loop = asyncio.get_running_loop()
         await self.application.initialize()
         # Apply bot commands so Telegram shows menu button with pop-up suggestions
         if self._commands:

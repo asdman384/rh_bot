@@ -60,6 +60,8 @@ class BotRunner:
 
         self.run = 1
         self.failed_runs = 0
+        # counts consecutive failed runs without a success in between
+        self.consecutive_failed_runs = 0
         self.time_start = time.time()
         self.debug = debug
         self.controller = Controller(
@@ -120,13 +122,19 @@ class BotRunner:
         # ---------------------- Main loop --------------------------
         current_run = 1
         while current_run < 45:
+            if self.consecutive_failed_runs >= 6:
+                logger.error(
+                    f"Too many consecutive failed runs: {self.consecutive_failed_runs}. Stopping bot."
+                )
+                raise Exception("Too many consecutive failed runs")
+
             t0 = time.time()
             # detecting start position
             self.check_main_map()
             self.check_town()
 
             # flush bag and back to main map
-            if current_run % 35 == 0 and type(self.boss) is not BossMine:  # every N run
+            if current_run % 40 == 0 and type(self.boss) is not BossMine:  # every N run
                 self.boss.back()
                 self.controller.flush_bag(decompose=True)
                 self.controller.full_back()
@@ -156,6 +164,7 @@ class BotRunner:
                     raise
                 self.boss.back()
                 self.failed_runs += 1
+                self.consecutive_failed_runs += 1
                 continue
 
             # enter boss gate
@@ -181,6 +190,7 @@ class BotRunner:
                     raise
                 self.boss.back()
                 self.failed_runs += 1
+                self.consecutive_failed_runs += 1
                 continue
 
             self.controller.yes()
@@ -227,9 +237,11 @@ class BotRunner:
                 )
 
             logger.info(
-                f"✅ - Run #{self.run:03d} - t:{time.time() - t0:.1f}s - m:{moves}"
+                f"✅ - Run #{self.run:03d} - t:{time.time() - t0:.1f}s - m:{moves} - cf:{self.consecutive_failed_runs}"
             )
 
+            # success resets consecutive failed counter
+            self.consecutive_failed_runs = 0
             current_run += 1
             self.run += 1
             self.boss.back()
@@ -248,9 +260,11 @@ class BotRunner:
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         boss_arg = sys.argv[1]
+        wait_failed_combat = len(sys.argv) > 2 and sys.argv[2].lower() == "true"
         debug = False
     else:
         boss_arg = "dain"
         debug = True
+        wait_failed_combat = True
 
-    BotRunner(boss_arg, debug).go(wait_failed_combat=True)
+    BotRunner(boss_arg, debug).go(wait_failed_combat)

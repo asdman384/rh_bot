@@ -21,6 +21,17 @@
                 "${workspaceFolder}/game_bot_service.py"
             ],
             "problemMatcher": []
+        },
+        {
+            "label": "dain wait_failed_combat",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/bot.py",
+                "dain",
+                "true"
+            ],
+            "problemMatcher": []
         }
     ],
     "inputs": [

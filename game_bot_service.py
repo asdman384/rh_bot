@@ -238,9 +238,10 @@ class GameBotService:
 
         except Exception as e:
             print(f"Ошибка в потоке game-бота: {e}")
-            # C:\dev\python\game_bot_service.py:216: RuntimeWarning: coroutine 'TelegramBot.notify_admins' was never awaited
-            time.sleep(1)
-            asyncio.run(self.bot.notify_admins(f"Ошибка в потоке game-бота: {e}"))
+            # Use thread-safe scheduling to notify admins from non-async thread
+            self.bot.notify_admins_threadsafe(
+                f"Ошибка в потоке game-бота: {e} \n see /logs see /screenshot"
+            )
 
     async def logs_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Отправить последние N строк лога (stdout/stderr). По умолчанию N=30."""
