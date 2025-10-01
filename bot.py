@@ -130,16 +130,17 @@ class BotRunner:
 
             t0 = time.time()
             # detecting start position
-            self.check_main_map()
-            self.check_town()
+            if type(self.boss) is not BossMine:
+                self.check_main_map()
+                self.check_town()
 
-            # flush bag and back to main map
-            if current_run % 40 == 0 and type(self.boss) is not BossMine:  # every N run
-                self.boss.back()
-                self.controller.flush_bag(decompose=True)
-                self.controller.full_back()
-                current_run = 1
-                continue
+                # flush bag and back to main map
+                if current_run % 40 == 0:  # every N run
+                    self.boss.back()
+                    self.controller.flush_bag(decompose=True)
+                    self.controller.full_back()
+                    current_run = 1
+                    continue
 
             if not self.boss.tavern_Route():
                 self.boss.back()
@@ -263,7 +264,7 @@ if __name__ == "__main__":
         wait_failed_combat = len(sys.argv) > 2 and sys.argv[2].lower() == "true"
         debug = False
     else:
-        boss_arg = "dain"
+        boss_arg = "dain"  # krokust | dain | bhalor | khanel | delingh | elvira | mine
         debug = True
         wait_failed_combat = True
 

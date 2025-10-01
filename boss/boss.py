@@ -239,6 +239,7 @@ class Boss(ABC):
         self.controller.press(315, 500, 1500)  # E
         time.sleep(0.5)
         self.controller.press(270, 460, 1600)  # NE
+        time.sleep(np.random.uniform(0.8, 1.6))
         return wait_for("resources/portal.png", self._get_frame, 0.8)
 
     def back(self) -> None:
@@ -247,7 +248,7 @@ class Boss(ABC):
         time.sleep(0.2)
         self.controller._tap((740, 500))  # select yes
         self.controller.wait_loading(1)
-        time.sleep(2.5)
+        time.sleep(2)
 
     def _attk_focus_arrow(self, p: cv2.typing.Point | None = None) -> float:
         self.controller.skill_1(p)  # focus arrow
@@ -265,3 +266,6 @@ class Boss(ABC):
 
     def fix_disaster(self):
         time.sleep(2.5)  # wait for any animation to finish
+
+    def fix_blockage(self):
+        pass

@@ -1,3 +1,4 @@
+import math
 import time
 
 import cv2
@@ -7,6 +8,8 @@ from boss.boss import extract_boss_health, measure_fill_px
 from boss.krokust import BossKrokust
 from detect_location import find_tpl
 from devices.device import Device
+from model import Direction
+
 
 device = Device("127.0.0.1", 58526)
 device.connect()
@@ -67,22 +70,22 @@ device.connect()
 # cv2.imshow("empty", panel)
 # cv2.setMouseCallback("empty", mouse_callback)
 
-x, y = 557, 370
+# x, y = 557, 370
 
 
-def mouse_callback(event, x_, y_, flags, param):
-    global x, y
-    if event != cv2.EVENT_LBUTTONDOWN:
-        return
-    x, y = x_, y_
-    print(f"x={x_}, y={y_}")
+# def mouse_callback(event, x_, y_, flags, param):
+#     global x, y
+#     if event != cv2.EVENT_LBUTTONDOWN:
+#         return
+#     x, y = x_, y_
+#     print(f"x={x_}, y={y_}")
 
 
-frame = device.get_frame2()
-cv2.imshow("frame", frame)
-cv2.setMouseCallback("frame", mouse_callback)
-cv2.waitKey(0)
-device.close()
+# frame = device.get_frame2()
+# cv2.imshow("frame", frame)
+# cv2.setMouseCallback("frame", mouse_callback)
+# cv2.waitKey(0)
+# device.close()
 
 
 # i = 0
@@ -97,3 +100,57 @@ device.close()
 # for _ in range(38):
 #     device.click((x, y))
 #     time.sleep(0.04)
+
+
+# DEAD CELL
+# dirs_angle = {
+#     Direction.SE: 35.5,
+#     Direction.SW: 144.5,
+#     Direction.NW: 215.5,
+#     Direction.NE: 324.5,
+# }
+# # Define a custom mask square of size 12x9
+
+# dx = math.cos(math.radians(dirs_angle[Direction.NE]))
+# dy = math.sin(math.radians(dirs_angle[Direction.NE]))
+# start_point = (9, 13)
+# for i in range(13):
+#     x = int(start_point[0] + round(i * dx))
+#     y = int(start_point[1] + round(i * dy))
+#     if 0 <= x < custom_mask.shape[1] and 0 <= y < custom_mask.shape[0]:
+#         custom_mask[y, x] = 255
+
+# dx = math.cos(math.radians(dirs_angle[Direction.NW]))
+# dy = math.sin(math.radians(dirs_angle[Direction.NW]))
+# start_point = (9, 13)
+# for i in range(13):
+#     x = int(start_point[0] + round(i * dx))
+#     y = int(start_point[1] + round(i * dy))
+#     if 0 <= x < custom_mask.shape[1] and 0 <= y < custom_mask.shape[0]:
+#         custom_mask[y, x] = 255
+
+# dx = math.cos(math.radians(dirs_angle[Direction.NE]))
+# dy = math.sin(math.radians(dirs_angle[Direction.NE]))
+# start_point = (0, 7)
+# for i in range(13):
+#     x = int(start_point[0] + round(i * dx))
+#     y = int(start_point[1] + round(i * dy))
+#     if 0 <= x < custom_mask.shape[1] and 0 <= y < custom_mask.shape[0]:
+#         custom_mask[y, x] = 255
+
+# dx = math.cos(math.radians(dirs_angle[Direction.NW]))
+# dy = math.sin(math.radians(dirs_angle[Direction.NW]))
+# start_point = (19, 6)
+# for i in range(13):
+#     x = int(start_point[0] + round(i * dx))
+#     y = int(start_point[1] + round(i * dy))
+#     if 0 <= x < custom_mask.shape[1] and 0 <= y < custom_mask.shape[0]:
+#         custom_mask[y, x] = 255
+
+custom_mask = np.ones((100, 100), dtype=np.uint8) * 0
+pts = np.array([[10, 5], [20, 30], [50, 10], [10, 5]], np.int32)
+cv2.polylines(custom_mask, [pts], False, 255, 1)
+
+cv2.imwrite("Custom Mask.png", custom_mask)
+
+# raise

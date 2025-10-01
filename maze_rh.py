@@ -56,14 +56,14 @@ class MazeRH:
         self.moves = 0
         self.last_combat = 0
         time.sleep(0.25)
-        self.sense()
+        self._sense()
 
     def is_exit(self) -> tuple[bool, Direction | None]:
         return self._is_exit
 
-    def move(self, d: Direction) -> tuple[bool, bool]:
+    def move(self, d: Direction, disaster_recovered=False) -> bool:
         """
-        return (move)
+        return is moved
         """
         self.moves += 2
         move = getattr(self.controller, f"move_{d.label}", None)
@@ -87,8 +87,17 @@ class MazeRH:
 
         time.sleep(0.15 if self.boss.sensor.fa else 0)
 
-        newFrame = self.sense()
-        return not self.boss.ensure_movement or self._is_moved(newFrame, d)
+        new_frame = self._sense()
+        if not self.boss.ensure_movement:
+            return True
+
+        is_moved = self._is_moved(new_frame, d)
+
+        if not is_moved and not disaster_recovered:
+            self.boss.fix_blockage()
+            return self.move(d, True)
+
+        return is_moved
 
     def _is_moved(self, frame: cv2.typing.MatLike, d: Direction):
         # ttt = newFrame.copy()
@@ -127,7 +136,7 @@ class MazeRH:
             self.controller.attack()
             self._enemies = self._count_enemies()
             attacks_count += 1
-        time.sleep(1)
+        time.sleep(2)
         self.moves += 1
         self.last_combat = self.moves
         return False
@@ -170,7 +179,7 @@ class MazeRH:
     def _open_dirs(self, frame):
         return self.boss.sensor.open_dirs(frame)
 
-    def sense(self) -> cv2.typing.MatLike:
+    def _sense(self) -> cv2.typing.MatLike:
         decoded = self._get_frame_fa()
         frame830x690 = extract_game(decoded)
 
@@ -212,20 +221,23 @@ if __name__ == "__main__":
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
-    boss = BossKrokust(controller, True)
+    boss = BossDelingh(controller, True)
     maze = MazeRH(controller, boss, True)
-    # boss.init_camera()
+    boss.init_camera()
+    boss.sensor.use_nogo = False
+    boss.sensor.moves = 3
+    time.sleep(0.2)
 
     # boss.start_fight(Direction.SW)
     # raise
     # # TEST is_near_exit
     while 1:
-        # maze.sense()
-        frame830x690 = extract_game(maze.get_frame())
-        frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
-        res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
-        _enemies = maze._count_enemies(frame830x690hsv, frame830x690)
-        print(res, _, _enemies)
+        maze._sense()
+        # frame830x690 = extract_game(maze.get_frame())
+        # frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
+        # res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
+        # _enemies = maze._count_enemies(frame830x690hsv, frame830x690)
+        # print(res, _, _enemies)
 
     # # TEST is_near_exit thresolds
     # frame = extract_game(device.get_frame2())

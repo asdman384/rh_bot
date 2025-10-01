@@ -24,16 +24,14 @@ class BossDelingh(Boss):
 
         self.minimap_masks = {
             "player": {
-                "l1": (161, 50, 134),
-                "u1": (180, 112, 170),
+                "l1": (160, 35, 110),
+                "u1": (175, 85, 160),
                 "l2": (161, 50, 134),
                 "u2": (180, 112, 170),
             },
             "path": {
                 "l1": (105, 126, 85),
                 "u1": (111, 172, 134),
-                "l2": (105, 126, 85),
-                "u2": (111, 172, 134),
             },
             "wall": {
                 "l1": (105, 126, 85),
@@ -47,11 +45,11 @@ class BossDelingh(Boss):
         self.sensor = MinimapSensor(
             None,
             self.minimap_masks,
-            {"ne": 50, "nw": 50, "se": 45, "sw": 45},
+            {"ne": 50, "nw": 50, "se": 35, "sw": 30},
+            use_nogo=False,
             debug=self.debug,
         )
-        self.controller.move_SE()
-        self.controller.move_NW()
+        self.controller.move_E()
 
     def start_fight(self, dir: Direction) -> int:
         print("Fighting boss Delingh...") if self.debug else None
@@ -68,6 +66,7 @@ class BossDelingh(Boss):
             hp = routine.pop()()
 
         print("Finished boss Delingh...") if self.debug else None
+        self.controller.wait_loading(2)
         return hp
 
     def open_chest(self, dir: Direction) -> bool:
@@ -84,5 +83,10 @@ class BossDelingh(Boss):
         time.sleep(2)
 
     def fix_disaster(self):
+        return
         self.controller.move_SE()
         time.sleep(0.2)
+
+    def fix_blockage(self):
+        self.controller.attack()
+        time.sleep(1.5)

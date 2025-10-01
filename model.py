@@ -20,6 +20,10 @@ class Direction(Enum):
     def label(self) -> str:
         return self.value[2]
 
+    @property
+    def opposite(self) -> "Direction":
+        return OPPOSITE[self]
+
     def __str__(self) -> str:
         return self.label
 

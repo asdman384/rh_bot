@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 from db import NE_RECT, NW_RECT, SE_RECT, SW_RECT
 from frames import extract_game
-from frames import extract_game
 from model import Direction
 
 
@@ -29,12 +28,14 @@ class Sensor(ABC):
         self.mask_colors = mask_colors
         self.debug = debug
         self._blue_mask = None
+        self.last_move_dir = Direction.SE
         self.thresholds = thresholds
         self.steps = 1
         self.fa = False
         self.moves = 0
 
     def move(self, dir: Direction) -> tuple[float, float]:
+        self.last_move_dir = dir
         self.moves += 1
         return 0.0, 0.0
 
@@ -54,9 +55,8 @@ class Sensor(ABC):
         H = 300
         return cv2.resize(frame[Y : Y + H, X : X + W], (W, H))
 
-    def find_blue_mask(self, bgr, mask_colors):
+    def find_blue_mask(self, hsv, mask_colors):
         """Возвращает маску синих коридоров (uint8 0/255)."""
-        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, mask_colors["l1"], mask_colors["u1"])
         # Убираем шум, заполняем дырки
         # create a custom diamond-shaped kernel
@@ -81,10 +81,6 @@ class Sensor(ABC):
         else:
             self._blue_mask = mask
 
-        if self.debug:
-            cv2.imshow("Sensor/blue_mask", self._blue_mask)
-            cv2.waitKey(1)
-
         return self._blue_mask
 
 
@@ -99,11 +95,92 @@ class MinimapSensor2(Sensor):
         Direction.NE: 324.5,
     }
 
+    def find_pale_pink_center(self, bgr, blue_mask, debug=False):
+        # ограничиваем поиск по зоне коридоров
+        masked = cv2.bitwise_and(bgr, bgr, mask=blue_mask)
+
+        # эталонный бледно-розовый (подтюньте под вашу картинку)
+        sample_bgr = np.uint8([[[132, 113, 148]]])  # B,G,R пример
+        sample_lab = cv2.cvtColor(sample_bgr, cv2.COLOR_BGR2LAB)[0, 0].astype(np.int16)
+
+        lab = cv2.cvtColor(masked, cv2.COLOR_BGR2LAB).astype(np.int16)
+        dist = np.sqrt(np.sum((lab - sample_lab) ** 2, axis=2)).astype(np.uint8)
+
+        # инвертируем расстояние в маску похожести (меньше = ближе к эталону)
+        _, pink_mask = cv2.threshold(dist, 25, 255, cv2.THRESH_BINARY_INV)
+        gray = cv2.cvtColor(masked, cv2.COLOR_BGR2GRAY)
+        _, bright = cv2.threshold(gray, 80, 255, cv2.THRESH_BINARY)
+        pink_mask = cv2.bitwise_and(pink_mask, bright)
+
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        pink_mask = cv2.morphologyEx(pink_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        pink_mask = cv2.morphologyEx(pink_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+        if debug:
+            cv2.imshow("masked", masked)
+            cv2.imshow("pink_mask", pink_mask)
+            cv2.waitKey(1)
+
+        # Попытка Hough на области с pink_mask
+        masked_for_hough = cv2.bitwise_and(
+            cv2.cvtColor(masked, cv2.COLOR_BGR2GRAY), pink_mask
+        )
+        blurred = cv2.GaussianBlur(masked_for_hough, (7, 7), 1.5)
+
+        circles = cv2.HoughCircles(
+            blurred,
+            cv2.HOUGH_GRADIENT,
+            dp=1.2,
+            minDist=10,
+            param1=50,
+            param2=18,
+            minRadius=6,
+            maxRadius=80,
+        )
+        if circles is not None:
+            circles = np.round(circles[0, :]).astype("int")
+            best = None
+            best_score = -1
+            h, w = pink_mask.shape[:2]
+            for x, y, r in circles:
+                # создаём булеву маску круга той же формы, что и изображение
+                yy, xx = np.ogrid[-y : h - y, -x : w - x]
+                circle_mask = (xx * xx + yy * yy) <= r * r
+                circle_mask_u8 = circle_mask.astype(np.uint8) * 255
+                inter = cv2.bitwise_and(pink_mask, pink_mask, mask=circle_mask_u8)
+                score = cv2.countNonZero(inter)
+                if score > best_score:
+                    best_score = score
+                    best = (x, y, r)
+            if best is not None and best_score > 10:
+                return best
+
+        # fallback: контуры
+        contours, _ = cv2.findContours(
+            pink_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        if not contours:
+            return None
+        contours = sorted(contours, key=cv2.contourArea, reverse=True)
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area < 20:
+                continue
+            (x, y), r = cv2.minEnclosingCircle(cnt)
+            circ_area = np.pi * (r**2)
+            if circ_area <= 0:
+                continue
+            fill_ratio = area / circ_area
+            if fill_ratio > 0.25 and r >= 4:
+                return (int(x), int(y), int(r))
+        return None
+
     def __init__(self, frame, mask_colors, thresholds=None, debug=False):
         super().__init__(frame, mask_colors, thresholds, debug)
 
         minimap = self.extract_minimap(frame)
-        blue_mask = self.find_blue_mask(minimap, self.mask_colors["path"])
+        hsv = cv2.cvtColor(minimap, cv2.COLOR_BGR2HSV)
+        blue_mask = self.find_blue_mask(hsv, self.mask_colors["path"])
         h, w = blue_mask.shape[:2]
         white_pixels = np.column_stack(np.where(blue_mask == 255))
         if white_pixels.size == 0:
@@ -155,7 +232,8 @@ class MinimapSensor2(Sensor):
 
         lengths = {}
         minimap = self.extract_minimap(frame)
-        mask = self.find_blue_mask(minimap, self.mask_colors["path"])
+        hsv = cv2.cvtColor(minimap, cv2.COLOR_BGR2HSV)
+        mask = self.find_blue_mask(hsv, self.mask_colors["path"])
 
         for dir in self.dirs_angle.keys():
             lengths[dir] = self._test_direction(
@@ -250,13 +328,35 @@ class MinimapSensor2(Sensor):
 
 
 class MinimapSensor(Sensor):
-    def __init__(self, frame, mask_colors, thresholds=None, minimap=None, debug=False):
+    def __init__(
+        self,
+        frame,
+        mask_colors,
+        thresholds=None,
+        minimap=None,
+        use_nogo=True,
+        debug=False,
+    ):
         super().__init__(frame, mask_colors, thresholds, debug)
         self._prev_p_xy = None
         self.steps = 2
+        self.straight_corridor = True
+        self.nogo = list()
+        self.use_nogo = use_nogo
 
     def open_dirs(self, frame: cv2.typing.MatLike):
-        if self.moves == 0:
+        minimap = self.extract_minimap(frame)
+        hsv = cv2.cvtColor(minimap, cv2.COLOR_BGR2HSV)
+        lab = self.find_blue_mask(hsv, self.mask_colors["path"])
+        pm = self.player_mask(hsv, self.mask_colors["player"])
+        p_xy = self.find_largest_contour_centroid(pm)
+
+        if self.moves < 2:
+            if self.use_nogo and p_xy is not None:
+                self.nogo.append(
+                    ((p_xy[0] - 6, p_xy[1] - 6), (p_xy[0] + 6, p_xy[1] + 6))
+                )
+
             return {
                 Direction.NW: False,
                 Direction.SE: True,
@@ -264,23 +364,7 @@ class MinimapSensor(Sensor):
                 Direction.NE: False,
             }
 
-        minimap = self.extract_minimap(frame)
-        hsv = cv2.cvtColor(minimap, cv2.COLOR_BGR2HSV)
-        pm = self.player_mask(hsv, self.mask_colors["player"])
-        pm = cv2.dilate(pm, np.ones((5, 5), np.uint8), iterations=1)
-        p_xy = self.find_largest_contour_centroid(pm)
-
-        path_m = cv2.inRange(
-            hsv, self.mask_colors["path"]["l1"], self.mask_colors["path"]["u1"]
-        )
-        # "Утолщаем" маску с помощью морфологического расширения
-        path_m = cv2.dilate(path_m, np.ones((3, 3), np.uint8), iterations=1)
-        # wall_m1 = cv2.inRange(hsv, masks["wall"]["l1"], masks["wall"]["u1"])
-        # wall_m2 = cv2.inRange(hsv, masks["wall"]["l2"], masks["wall"]["u2"])
-        # lab = cv2.bitwise_or(path_m, cv2.bitwise_or(wall_m1, wall_m2))
-        lab = cv2.bitwise_or(path_m, pm)
-
-        offset = {"NE": (5, -10), "NW": (-12, -10), "SW": (-12, 2), "SE": (4, 2)}
+        offset = {"NE": (5, -10), "NW": (-12, -10), "SW": (-12, 2), "SE": (3, 1)}
 
         ne = 0
         nw = 0
@@ -295,12 +379,55 @@ class MinimapSensor(Sensor):
             nw = self.check_rect(lab, p_xy, self._prev_p_xy, offset["NW"], NW_RECT)
             se = self.check_rect(lab, p_xy, self._prev_p_xy, offset["SE"], SE_RECT)
             sw = self.check_rect(lab, p_xy, self._prev_p_xy, offset["SW"], SW_RECT)
-            cv2.circle(minimap, p_xy, 1, (255, 255, 255), 1)
+
+        result = {
+            Direction.NE: ne > self.thresholds["ne"],
+            Direction.NW: nw > self.thresholds["nw"],
+            Direction.SE: se > self.thresholds["se"],
+            Direction.SW: sw > self.thresholds["sw"],
+        }
+
+        if self.use_nogo:
+            if self.straight_corridor:
+                self.straight_corridor = list(result.values()).count(True) <= 2
+                if self.straight_corridor and p_xy is not None:
+                    self.nogo.append(
+                        ((p_xy[0] - 4, p_xy[1] - 4), (p_xy[0] + 4, p_xy[1] + 4))
+                    )
 
         if p_xy is not None:
             self._prev_p_xy = p_xy
 
+        if self.use_nogo:
+            nogo_match = False
+            if not self.straight_corridor:
+                for (x1, y1), (x2, y2) in self.nogo:
+                    if x1 <= p_xy[0] <= x2 and y1 <= p_xy[1] <= y2:
+                        nogo_match = True
+                        break
+
+                if nogo_match:
+                    for d in result.keys():
+                        result[d] = False
+                    result[self.last_move_dir.opposite] = True
+
         if self.debug:
+            cv2.circle(minimap, p_xy, 1, (255, 255, 255), 1)
+            if self.use_nogo:
+                for ng in self.nogo:
+                    cv2.rectangle(minimap, ng[0], ng[1], (0, 0, 255), 1)
+
+                if nogo_match:
+                    cv2.putText(
+                        minimap,
+                        "NOGO",
+                        (10, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1,
+                        (0, 0, 255),
+                        2,
+                    )
+
             self.draw_rect(
                 minimap,
                 p_xy,
@@ -333,26 +460,27 @@ class MinimapSensor(Sensor):
                 SE_RECT,
                 (0, 255, 0) if se > self.thresholds["se"] else (0, 0, 255),
             )
-            cv2.imshow("minimap/minimap", minimap)
-            cv2.imshow("minimap/pm", pm)
             cv2.putText(
-                lab,
+                minimap,
                 f"ne={ne:.1f} nw={nw:.1f} se={se:.1f} sw={sw:.1f}",
                 (10, 20),
                 0,
-                0.6,
+                0.5,
                 (255, 255, 255),
                 1,
             )
-            cv2.imshow("minimap/lab", lab)
-            cv2.waitKey(10)
 
-        return {
-            Direction.NE: ne > self.thresholds["ne"],
-            Direction.NW: nw > self.thresholds["nw"],
-            Direction.SE: se > self.thresholds["se"],
-            Direction.SW: sw > self.thresholds["sw"],
-        }
+            debug = np.hstack(
+                (
+                    minimap,
+                    cv2.cvtColor(lab, cv2.COLOR_GRAY2BGR),
+                    cv2.cvtColor(pm, cv2.COLOR_GRAY2BGR),
+                )
+            )
+            cv2.imshow("open_dirs/debug", debug)
+            cv2.waitKey(1)
+
+        return result
 
     def player_mask(self, hsv: cv2.typing.MatLike, masks) -> cv2.typing.MatLike:
         pm1 = cv2.inRange(hsv, masks["l1"], masks["u1"])
@@ -360,9 +488,12 @@ class MinimapSensor(Sensor):
         pm = cv2.bitwise_or(pm1, pm2)
 
         # Чистим от шумов
-        kernel = np.ones((3, 3), np.uint8)
+        # kernel = np.ones((3, 3), np.uint8)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         # pm = cv2.morphologyEx(pm, cv2.MORPH_OPEN, kernel, iterations=1)
         pm = cv2.morphologyEx(pm, cv2.MORPH_CLOSE, kernel, iterations=1)
+        pm = cv2.dilate(pm, np.ones((3, 3), np.uint8), iterations=1)
+
         return pm
 
     def find_largest_contour_centroid(self, mask):

@@ -68,21 +68,21 @@ class BossMine(Boss):
         )
         if box is not None:
             dist = hypot(box["cx"] - px, box["cy"] - py)
-            return 1 if dist < 265 else 0
+            return 1 if dist < 180 else 0
 
         box, score = find_tpl(
             frame830x690, self.enemy1_ne, [1.0], score_threshold=0.8, debug=self.debug
         )
         if box is not None:
             dist = hypot(box["cx"] - px, box["cy"] - py)
-            return 1 if dist < 265 else 0
+            return 1 if dist < 180 else 0
 
         box, score = find_tpl(
             frame830x690, self.enemy2, [1.0], score_threshold=0.8, debug=self.debug
         )
         if box is not None:
             dist = hypot(box["cx"] - px, box["cy"] - py)
-            return 1 if dist < 265 else 0
+            return 1 if dist < 180 else 0
 
         return 0
 
