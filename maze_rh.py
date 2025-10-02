@@ -136,7 +136,7 @@ class MazeRH:
             self.controller.attack()
             self._enemies = self._count_enemies()
             attacks_count += 1
-        time.sleep(2)
+        time.sleep(2.5)
         self.moves += 1
         self.last_combat = self.moves
         return False

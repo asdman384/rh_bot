@@ -58,7 +58,7 @@ class BotRunner:
         else:
             raise ValueError(f"Unknown boss type: {boss_type}")
 
-        self.run = 1
+        self.run = 0
         self.failed_runs = 0
         # counts consecutive failed runs without a success in between
         self.consecutive_failed_runs = 0
@@ -120,8 +120,8 @@ class BotRunner:
 
     def go(self, wait_failed_combat=False):
         # ---------------------- Main loop --------------------------
-        current_run = 1
-        while current_run < 45:
+        current_run = 0
+        while True:
             if self.consecutive_failed_runs >= 6:
                 logger.error(
                     f"Too many consecutive failed runs: {self.consecutive_failed_runs}. Stopping bot."
@@ -135,14 +135,21 @@ class BotRunner:
                 self.check_town()
 
                 # flush bag and back to main map
-                if current_run % 40 == 0:  # every N run
+                if current_run != 0 and current_run % 40 == 0:  # every N run
                     self.boss.back()
                     self.controller.flush_bag(decompose=True)
                     self.controller.full_back()
-                    current_run = 1
+                    current_run = 0
+                    msg = (
+                        f"Flush bag: total time: {self.get_total_time()}"
+                        f"\nRuns per hour: {self.get_runs_per_hour():.2f}"
+                        f"\nFailed runs: {self.failed_runs}/{self.run}"
+                    )
+                    logger.info(msg)
                     continue
 
             if not self.boss.tavern_Route():
+                self.controller.move_W(4)
                 self.boss.back()
                 continue
 
@@ -237,14 +244,13 @@ class BotRunner:
                     f"images/run_{time.strftime('%H-%M-%S')}({time.time() - t0:.1f}s).png",
                 )
 
-            logger.info(
-                f"✅ - Run #{self.run:03d} - t:{time.time() - t0:.1f}s - m:{moves} - cf:{self.consecutive_failed_runs}"
-            )
-
             # success resets consecutive failed counter
             self.consecutive_failed_runs = 0
             current_run += 1
             self.run += 1
+            logger.info(
+                f"✅ - Run #{self.run:03d} - t:{time.time() - t0:.1f}s - m:{moves} - cf:{self.consecutive_failed_runs}"
+            )
             self.boss.back()
 
     def __del__(self):

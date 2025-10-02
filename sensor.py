@@ -23,6 +23,16 @@ from model import Direction
 
 
 class Sensor(ABC):
+    max_ray_len = 25
+    W = 350
+    H = 300
+    ANGLE = {
+        Direction.SE: 35.5,
+        Direction.SW: 144.5,
+        Direction.NW: 215.5,
+        Direction.NE: 324.5,
+    }
+
     def __init__(self, frame, mask_colors, thresholds=None, debug=False) -> None:
         self.first_open_dirs_call = True
         self.mask_colors = mask_colors
@@ -33,6 +43,7 @@ class Sensor(ABC):
         self.steps = 1
         self.fa = False
         self.moves = 0
+        self.max_xy = (self.W, self.H)
 
     def move(self, dir: Direction) -> tuple[float, float]:
         self.last_move_dir = dir
@@ -51,8 +62,8 @@ class Sensor(ABC):
     def extract_minimap(self, frame: cv2.typing.MatLike) -> cv2.typing.MatLike:
         X = 0
         Y = 100
-        W = 350
-        H = 300
+        W = self.W
+        H = self.H
         return cv2.resize(frame[Y : Y + H, X : X + W], (W, H))
 
     def find_blue_mask(self, hsv, mask_colors):
@@ -60,19 +71,19 @@ class Sensor(ABC):
         mask = cv2.inRange(hsv, mask_colors["l1"], mask_colors["u1"])
         # Убираем шум, заполняем дырки
         # create a custom diamond-shaped kernel
-        kernel = np.array(
-            [
-                [0, 0, 0, 0, 1, 0, 0, 0, 0],
-                [0, 0, 1, 1, 1, 1, 1, 0, 0],
-                [0, 1, 1, 1, 1, 1, 1, 1, 0],
-                [1, 1, 1, 1, 1, 1, 1, 1, 1],
-                [0, 1, 1, 1, 1, 1, 1, 1, 0],
-                [0, 0, 1, 1, 1, 1, 1, 0, 0],
-                [0, 0, 0, 0, 1, 0, 0, 0, 0],
-            ],
-            dtype=np.uint8,
-        )
-        # kernel = cv2.getStructuringElement(cv2.MORPH_DIAMOND, (7, 7))
+        # kernel = np.array(
+        #     [
+        #         [0, 0, 0, 0, 1, 0, 0, 0, 0],
+        #         [0, 0, 1, 1, 1, 1, 1, 0, 0],
+        #         [0, 1, 1, 1, 1, 1, 1, 1, 0],
+        #         [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        #         [0, 1, 1, 1, 1, 1, 1, 1, 0],
+        #         [0, 0, 1, 1, 1, 1, 1, 0, 0],
+        #         [0, 0, 0, 0, 1, 0, 0, 0, 0],
+        #     ],
+        #     dtype=np.uint8,
+        # )
+        kernel = cv2.getStructuringElement(cv2.MORPH_DIAMOND, (7, 7))
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
 
@@ -83,17 +94,42 @@ class Sensor(ABC):
 
         return self._blue_mask
 
+    def ray_len(
+        self,
+        mask: cv2.typing.MatLike,
+        start_x: float,
+        start_y: float,
+        angle: float,
+        debug_minimap: cv2.typing.MatLike = None,
+    ) -> int:
+        length = 0
+        dx = math.cos(math.radians(angle))
+        dy = math.sin(math.radians(angle))
+        x = start_x
+        y = start_y
+        len_sealed = False
+        for _ in range(1, self.max_ray_len + 1):
+            x += dx
+            y += dy
+            xi, yi = int(round(x)), int(round(y))
+            if xi < 0 or yi < 0 or xi >= self.max_xy[0] or yi >= self.max_xy[1]:
+                break
+            if mask[yi, xi] == 255:
+                length = (
+                    math.hypot(x - start_x, y - start_y) if not len_sealed else length
+                )
+                if debug_minimap is not None:
+                    debug_minimap[yi, xi] = (0, 255, 0)
+            else:
+                len_sealed = True
+                if debug_minimap is not None:
+                    debug_minimap[yi, xi] = (0, 0, 255)
+
+        return int(round(length))
+
 
 class MinimapSensor2(Sensor):
-    max_len = 20
     step = 3.33
-
-    dirs_angle = {
-        Direction.SE: 35.5,
-        Direction.SW: 144.5,
-        Direction.NW: 215.5,
-        Direction.NE: 324.5,
-    }
 
     def find_pale_pink_center(self, bgr, blue_mask, debug=False):
         # ограничиваем поиск по зоне коридоров
@@ -188,7 +224,6 @@ class MinimapSensor2(Sensor):
 
         y, x = white_pixels[np.argmin(white_pixels[:, 0])]
         self.current_xy = (x + 19, y + 33)
-        self.max_xy = (w, h)
         if debug:
             cv2.circle(minimap, self.current_xy, 2, (0, 255, 255), 1)
             cv2.imshow("Sensor/start", minimap)
@@ -196,21 +231,17 @@ class MinimapSensor2(Sensor):
 
     def _calibrate_initial_xy(self, blue_mask):
         print("Calibrating initial position...")
-        ne_length = self.ray_len(
-            blue_mask, *self.current_xy, self.dirs_angle[Direction.NE]
-        )
-        sw_length = self.ray_len(
-            blue_mask, *self.current_xy, self.dirs_angle[Direction.SW]
-        )
+        ne_length = self.ray_len(blue_mask, *self.current_xy, self.ANGLE[Direction.NE])
+        sw_length = self.ray_len(blue_mask, *self.current_xy, self.ANGLE[Direction.SW])
         diff = (ne_length - sw_length) / 2
-        dx = diff * math.cos(math.radians(self.dirs_angle[Direction.NE]))
-        dy = diff * math.sin(math.radians(self.dirs_angle[Direction.NE]))
+        dx = diff * math.cos(math.radians(self.ANGLE[Direction.NE]))
+        dy = diff * math.sin(math.radians(self.ANGLE[Direction.NE]))
         self.current_xy = (self.current_xy[0] + dx, self.current_xy[1] + dy)
         pass
 
     def move(self, dir: Direction) -> tuple[float, float]:
-        dx = math.cos(math.radians(self.dirs_angle[dir])) * self.step
-        dy = math.sin(math.radians(self.dirs_angle[dir])) * self.step
+        dx = math.cos(math.radians(self.ANGLE[dir])) * self.step
+        dy = math.sin(math.radians(self.ANGLE[dir])) * self.step
         self.current_xy = (self.current_xy[0] + dx, self.current_xy[1] + dy)
         self.moves += 1
         if self.moves == 2:
@@ -235,7 +266,7 @@ class MinimapSensor2(Sensor):
         hsv = cv2.cvtColor(minimap, cv2.COLOR_BGR2HSV)
         mask = self.find_blue_mask(hsv, self.mask_colors["path"])
 
-        for dir in self.dirs_angle.keys():
+        for dir in self.ANGLE.keys():
             lengths[dir] = self._test_direction(
                 mask, dir, minimap if self.debug else None
             )
@@ -254,7 +285,7 @@ class MinimapSensor2(Sensor):
             cv2.waitKey(1)
 
         open_dirs = {}
-        for dir in self.dirs_angle.keys():
+        for dir in self.ANGLE.keys():
             open_dirs[dir] = (8.1 < lengths[dir][0] <= 22) and (
                 8.1 < lengths[dir][1] <= 22
             )
@@ -272,7 +303,7 @@ class MinimapSensor2(Sensor):
         dir: Direction,
         debug_minimap: cv2.typing.MatLike = None,
     ) -> tuple[float, float]:
-        angle = self.dirs_angle[dir]  # degrees
+        angle = self.ANGLE[dir]  # degrees
         self.ray_len(mask, *self.current_xy, angle, debug_minimap)
 
         if dir == Direction.SE:
@@ -293,41 +324,10 @@ class MinimapSensor2(Sensor):
 
         return left_length, right_length
 
-    def ray_len(
-        self,
-        mask: cv2.typing.MatLike,
-        x: float,
-        y: float,
-        angle: float,
-        debug_minimap: cv2.typing.MatLike = None,
-    ) -> float:
-        length = 0
-        dx = math.cos(math.radians(angle))
-        dy = math.sin(math.radians(angle))
-        len_sealed = False
-        for _ in range(1, self.max_len + 1):
-            x += dx
-            y += dy
-            xi, yi = int(round(x)), int(round(y))
-            if xi < 0 or yi < 0 or xi >= self.max_xy[0] or yi >= self.max_xy[1]:
-                break
-            if mask[yi, xi] == 255:
-                length = (
-                    math.hypot(x - self.current_xy[0], y - self.current_xy[1])
-                    if not len_sealed
-                    else length
-                )
-                if debug_minimap is not None:
-                    debug_minimap[yi, xi] = (0, 255, 0)
-            else:
-                len_sealed = True
-                if debug_minimap is not None:
-                    debug_minimap[yi, xi] = (0, 0, 255)
-
-        return length
-
 
 class MinimapSensor(Sensor):
+    dead_room_detection_cd = 25  # moves
+
     def __init__(
         self,
         frame,
@@ -343,12 +343,13 @@ class MinimapSensor(Sensor):
         self.straight_corridor = True
         self.nogo = list()
         self.use_nogo = use_nogo
+        self.dead_room_detected_at = 0
 
     def open_dirs(self, frame: cv2.typing.MatLike):
         minimap = self.extract_minimap(frame)
         hsv = cv2.cvtColor(minimap, cv2.COLOR_BGR2HSV)
         lab = self.find_blue_mask(hsv, self.mask_colors["path"])
-        pm = self.player_mask(hsv, self.mask_colors["player"])
+        pm = self.player_mask(hsv, lab, self.mask_colors["player"])
         p_xy = self.find_largest_contour_centroid(pm)
 
         if self.moves < 2:
@@ -364,7 +365,7 @@ class MinimapSensor(Sensor):
                 Direction.NE: False,
             }
 
-        offset = {"NE": (5, -10), "NW": (-12, -10), "SW": (-12, 2), "SE": (3, 1)}
+        offset = {"NE": (5, -10), "NW": (-11, -10), "SW": (-12, 2), "SE": (3, 1)}
 
         ne = 0
         nw = 0
@@ -374,11 +375,50 @@ class MinimapSensor(Sensor):
         if p_xy is None and self._prev_p_xy is not None:
             p_xy = self._prev_p_xy
 
+        # is_dead_room = False
+        # forward_wall_dist, left_wall_dist, right_wall_dist = 0, 0, 0
+
         if p_xy is not None:
             ne = self.check_rect(lab, p_xy, self._prev_p_xy, offset["NE"], NE_RECT)
             nw = self.check_rect(lab, p_xy, self._prev_p_xy, offset["NW"], NW_RECT)
             se = self.check_rect(lab, p_xy, self._prev_p_xy, offset["SE"], SE_RECT)
             sw = self.check_rect(lab, p_xy, self._prev_p_xy, offset["SW"], SW_RECT)
+
+            # if (
+            #     self.dead_room_detected_at == 0
+            #     or (
+            #         self.moves - self.dead_room_detected_at
+            #         > self.dead_room_detection_cd
+            #     )
+            #     or True
+            # ):
+            #     forward_wall_dist = self.ray_len(
+            #         lab,
+            #         *p_xy,
+            #         self.ANGLE[self.last_move_dir],
+            #         minimap if self.debug else None,
+            #     )
+            #     left_wall_dist = self.ray_len(
+            #         lab,
+            #         *p_xy,
+            #         self.ANGLE[self.last_move_dir.left],
+            #         minimap if self.debug else None,
+            #     )
+            #     right_wall_dist = self.ray_len(
+            #         lab,
+            #         *p_xy,
+            #         self.ANGLE[self.last_move_dir.right],
+            #         minimap if self.debug else None,
+            #     )
+            #     is_dead_room = (
+            #         20 <= (left_wall_dist + right_wall_dist) <= 30
+            #         and (6 < left_wall_dist <= 20)
+            #         and (6 < right_wall_dist <= 20)
+            #         and (15 < forward_wall_dist <= 20)
+            #     )
+
+            # if is_dead_room:
+            #     self.dead_room_detected_at = self.moves
 
         result = {
             Direction.NE: ne > self.thresholds["ne"],
@@ -470,6 +510,25 @@ class MinimapSensor(Sensor):
                 1,
             )
 
+            # cv2.putText(
+            #     minimap,
+            #     f"left_dist={left_wall_dist} right_dist={right_wall_dist}",
+            #     (10, self.H - 20),
+            #     0,
+            #     0.5,
+            #     (0, 0, 255) if is_dead_room else (0, 255, 0),
+            #     1,
+            # )
+            # cv2.putText(
+            #     minimap,
+            #     f"forward_wall_dist={forward_wall_dist}",
+            #     (10, self.H - 40),
+            #     0,
+            #     0.5,
+            #     (0, 0, 255) if is_dead_room else (0, 255, 0),
+            #     1,
+            # )
+
             debug = np.hstack(
                 (
                     minimap,
@@ -477,12 +536,23 @@ class MinimapSensor(Sensor):
                     cv2.cvtColor(pm, cv2.COLOR_GRAY2BGR),
                 )
             )
+
+            # if is_dead_room:
+            #     cv2.imwrite(f"images/dead/room{self.moves}.png", debug)
+
             cv2.imshow("open_dirs/debug", debug)
             cv2.waitKey(1)
 
+        # is_dead_room = False
         return result
 
-    def player_mask(self, hsv: cv2.typing.MatLike, masks) -> cv2.typing.MatLike:
+    def player_mask(
+        self, hsv: cv2.typing.MatLike, lab: cv2.typing.MatLike, masks
+    ) -> cv2.typing.MatLike:
+        zone = lab.copy()
+        zone = cv2.dilate(zone, np.ones((5, 5), np.uint8), iterations=1)
+        hsv = cv2.bitwise_and(hsv, hsv, mask=zone)
+
         pm1 = cv2.inRange(hsv, masks["l1"], masks["u1"])
         pm2 = cv2.inRange(hsv, masks["l2"], masks["u2"])
         pm = cv2.bitwise_or(pm1, pm2)

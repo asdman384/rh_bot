@@ -24,6 +24,14 @@ class Direction(Enum):
     def opposite(self) -> "Direction":
         return OPPOSITE[self]
 
+    @property
+    def left(self) -> "Direction":
+        return LEFT_DIRS[self]
+
+    @property
+    def right(self) -> "Direction":
+        return RIGHT_TURNS[self]
+
     def __str__(self) -> str:
         return self.label
 
@@ -38,6 +46,19 @@ ALL_DIRS: List[Direction] = [
     Direction.NW,
 ]
 
+LEFT_DIRS: Dict[Direction, Direction] = {
+    Direction.NE: Direction.NW,
+    Direction.NW: Direction.SW,
+    Direction.SW: Direction.SE,
+    Direction.SE: Direction.NE,
+}
+
+RIGHT_TURNS: Dict[Direction, Direction] = {
+    Direction.NE: Direction.SE,
+    Direction.SE: Direction.SW,
+    Direction.SW: Direction.NW,
+    Direction.NW: Direction.NE,
+}
 
 OPPOSITE: Dict[Direction, Direction] = {
     Direction.NE: Direction.SW,

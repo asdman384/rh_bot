@@ -3,6 +3,7 @@ import time
 import cv2
 
 from boss.boss import Boss
+from bot_utils.screenshoter import save_image
 from controller import Controller
 from model import Direction
 from sensor import MinimapSensor
@@ -20,14 +21,15 @@ class BossDelingh(Boss):
         self.exit_check_type = "tpl"  # 'mask' | 'tpl'
         self.exit_tpl_sw = cv2.imread("resources/delingh/exit_sw.png")
         self.exit_tpl_ne = cv2.imread("resources/delingh/exit_ne.png")
-        self.exit_tpl_ne_threshold = 0.62
+        self.exit_tpl_ne_threshold = 0.8
+        self.exit_tpl_sw_threshold = 0.7
 
         self.minimap_masks = {
             "player": {
                 "l1": (160, 35, 110),
                 "u1": (175, 85, 160),
-                "l2": (161, 50, 134),
-                "u2": (180, 112, 170),
+                "l2": (135, 40, 147),
+                "u2": (165, 70, 206),
             },
             "path": {
                 "l1": (105, 126, 85),
@@ -47,6 +49,7 @@ class BossDelingh(Boss):
             self.minimap_masks,
             {"ne": 50, "nw": 50, "se": 35, "sw": 30},
             use_nogo=False,
+            # debug=True,
             debug=self.debug,
         )
         self.controller.move_E()
@@ -88,5 +91,15 @@ class BossDelingh(Boss):
         time.sleep(0.2)
 
     def fix_blockage(self):
+        # save_image(
+        #     self.controller.device.get_frame2(),
+        #     f"fails/delingh/blockage_{time.strftime('%H-%M-%S')}_enter.png",
+        # )
+        time.sleep(0.2)
         self.controller.attack()
-        time.sleep(1.5)
+        self.controller.attack()
+        time.sleep(1)
+        # save_image(
+        #     self.controller.device.get_frame2(),
+        #     f"fails/delingh/blockage_{time.strftime('%H-%M-%S')}_exit.png",
+        # )

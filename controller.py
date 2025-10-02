@@ -1,8 +1,11 @@
+import logging
 import time
 import cv2
 
 from detect_location import find_tpl, wait_for, wait_loading
 from devices.device import Device
+
+logger = logging.getLogger(__name__)
 
 
 class Controller:
@@ -134,15 +137,15 @@ class Controller:
             monetia_box, _ = find_tpl(get_frame(), monetia, debug=self.debug)
 
     def flush_bag(self, decompose=True) -> bool:
-        print("flush bag")
+        logger.debug("flush bag")
         black = cv2.imread("resources/black.png", cv2.IMREAD_COLOR)
         black_box, _ = find_tpl(self.device.get_frame2(), black, score_threshold=0.9)
         if black_box is None:
-            print("failed to flush bag")
+            logger.debug("failed to flush bag")
             return False
 
         # sort
-        print("sort Inventory")
+        logger.debug("sort Inventory")
         self._tap((880, 620))  # Inventory button
         time.sleep(0.5)
         self._tap((1170, 650))  # Sort button
@@ -151,13 +154,13 @@ class Controller:
         time.sleep(0.5)
 
         # go blacksmith
-        print("go blacksmith")
+        logger.debug("go blacksmith")
         self._tap((black_box["x"], black_box["y"]))
         time.sleep(1)
 
         # Decompose routine
         if decompose:
-            print("decompose items")
+            logger.debug("decompose items")
             self._tap((1060, 320))  # Decompose button
             time.sleep(1)
             for x in range(680, 1081, 100):
@@ -180,7 +183,7 @@ class Controller:
             time.sleep(0.5)
 
         # Trade routine
-        print("trade items")
+        logger.debug("trade items")
         self._tap((1060, 390))  # Trade button
         time.sleep(0.5)
         self._tap((700, 380))  # Equip tab
