@@ -5,7 +5,6 @@ import cv2
 
 from boss.boss import Boss
 from controller import Controller
-from count_enemies import count_enemies
 from devices.device import Device
 from edges_diff import bytes_hamming, roi_edge_signature
 from frames import extract_game
@@ -79,7 +78,7 @@ class MazeRH:
             if _ != self.boss.sensor.steps - 1:
                 frame830x690 = extract_game(self.get_frame())
                 frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
-                self._enemies = self._count_enemies(frame830x690hsv, frame830x690)
+                self._enemies = self._count_enemies(frame830x690)
                 self._is_exit = self.boss.is_near_exit(frame830x690hsv, frame830x690)
 
             if self._is_exit[0] and self._enemies == 0:
@@ -141,21 +140,10 @@ class MazeRH:
         self.last_combat = self.moves
         return False
 
-    def _count_enemies(
-        self,
-        frame830x690hsv: cv2.typing.MatLike | None = None,
-        frame830x690: cv2.typing.MatLike | None = None,
-    ) -> int:
-        if self.boss.no_combat_minions:
-            return self.boss.count_enemies(
-                extract_game(self.get_frame()) if frame830x690 is None else frame830x690
-            )
-
-        if frame830x690hsv is None:
-            frame830x690hsv = cv2.cvtColor(
-                extract_game(self.get_frame()), cv2.COLOR_BGR2HSV
-            )
-        return count_enemies(frame830x690hsv, self.debug)
+    def _count_enemies(self, frame830x690: cv2.typing.MatLike | None = None) -> int:
+        return self.boss.count_enemies(
+            extract_game(self.get_frame()) if frame830x690 is None else frame830x690
+        )
 
     def can_move(self, d: Direction) -> bool:
         return self._direction_dict.get(d, False)
@@ -187,7 +175,7 @@ class MazeRH:
         # detect exit
         self._is_exit = self.boss.is_near_exit(frame830x690hsv, frame830x690)
         # detect enemies
-        self._enemies = self._count_enemies(frame830x690hsv, frame830x690)
+        self._enemies = self._count_enemies(frame830x690)
         if self._enemies > 0:
             self._clear_enemies(self.boss.use_slide)
 

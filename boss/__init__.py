@@ -5,6 +5,7 @@ from .khanel import BossKhanel
 from .elvira import BossElvira
 from .mine import BossMine
 from .krokust import BossKrokust
+from .troll import BossTroll
 from .boss import Boss
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "BossElvira",
     "BossMine",
     "BossKrokust",
+    "BossTroll",
 ]

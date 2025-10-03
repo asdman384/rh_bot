@@ -70,22 +70,20 @@ device.connect()
 # cv2.imshow("empty", panel)
 # cv2.setMouseCallback("empty", mouse_callback)
 
-# x, y = 557, 370
+x, y = 557, 370
+def mouse_callback(event, x_, y_, flags, param):
+    global x, y
+    if event != cv2.EVENT_LBUTTONDOWN:
+        return
+    x, y = x_, y_
+    print(f"x={x_}, y={y_}")
 
 
-# def mouse_callback(event, x_, y_, flags, param):
-#     global x, y
-#     if event != cv2.EVENT_LBUTTONDOWN:
-#         return
-#     x, y = x_, y_
-#     print(f"x={x_}, y={y_}")
-
-
-# frame = device.get_frame2()
-# cv2.imshow("frame", frame)
-# cv2.setMouseCallback("frame", mouse_callback)
-# cv2.waitKey(0)
-# device.close()
+frame = device.get_frame2()
+cv2.imshow("frame", frame)
+cv2.setMouseCallback("frame", mouse_callback)
+cv2.waitKey(0)
+device.close()
 
 
 # i = 0
@@ -147,10 +145,10 @@ device.connect()
 #     if 0 <= x < custom_mask.shape[1] and 0 <= y < custom_mask.shape[0]:
 #         custom_mask[y, x] = 255
 
-custom_mask = np.ones((100, 100), dtype=np.uint8) * 0
-pts = np.array([[10, 5], [20, 30], [50, 10], [10, 5]], np.int32)
-cv2.polylines(custom_mask, [pts], False, 255, 1)
+# custom_mask = np.ones((100, 100), dtype=np.uint8) * 0
+# pts = np.array([[10, 5], [20, 30], [50, 10], [10, 5]], np.int32)
+# cv2.polylines(custom_mask, [pts], False, 255, 1)
 
-cv2.imwrite("Custom Mask.png", custom_mask)
+# cv2.imwrite("Custom Mask.png", custom_mask)
 
 # raise

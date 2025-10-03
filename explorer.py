@@ -86,33 +86,19 @@ class Explorer:
         steps = 0
         # Первичная сенсорика
         self.sense_here()
-        last_dir: Direction | None = None
 
         while steps < max_steps:
             # Отметить посещение текущей клетки
             self.map.ensure(self.pos).visited += 1
 
             # Проверка выхода
-            exit = self.maze.is_exit()
-            if exit[0]:
+            exit, dir = self.maze.is_exit()
+            if exit:
                 logger.debug(f"[OK] Exit reached at {self.pos} in {steps} steps.")
-
-                # TODO: return for all bosses
-                if (
-                    type(self.maze.boss) is BossBhalor
-                    or type(self.maze.boss) is BossDain
-                ):
-                    return "success", steps, exit[1]
-                # TODO: remove
-                # dir can be either SW or NE
-                if last_dir == Direction.NW:
-                    last_dir = Direction.SW
-                elif last_dir == Direction.SE:
-                    last_dir = Direction.NE
-                return "success", steps, last_dir
+                return "success", steps, dir
 
             # Выбрать локальный ход (в ещё не посещённого соседа)
-            last_dir = d = self._pick_local_step()
+            d = self._pick_local_step()
 
             # Если локальных кандидатов нет — пойдём к ближайшей известной непосещённой клетке
             if d is None:

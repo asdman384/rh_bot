@@ -13,6 +13,7 @@ from boss import (
     BossKhanel,
     BossMine,
     BossKrokust,
+    BossTroll,
 )
 from bot_utils.logger_memory import LastLogsHandler
 from bot_utils.screenshoter import save_image
@@ -47,6 +48,7 @@ class BotRunner:
         "khanel": BossKhanel,
         "delingh": BossDelingh,
         "elvira": BossElvira,
+        "troll": BossTroll,
         "mine": BossMine,
     }
     last_logs_handler: LastLogsHandler
@@ -270,8 +272,8 @@ if __name__ == "__main__":
         wait_failed_combat = len(sys.argv) > 2 and sys.argv[2].lower() == "true"
         debug = False
     else:
-        boss_arg = "dain"  # krokust | dain | bhalor | khanel | delingh | elvira | mine
-        debug = True
+        boss_arg = "troll"  # krokust | dain | bhalor | khanel | delingh | elvira | mine | troll
+        debug = False
         wait_failed_combat = True
 
     BotRunner(boss_arg, debug).go(wait_failed_combat)

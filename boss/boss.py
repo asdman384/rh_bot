@@ -131,7 +131,7 @@ class Boss(ABC):
         self, hsv: cv2.typing.MatLike
     ) -> tuple[bool, Direction | None]:
         """
-        https://pseudopencv.site/utilities/hsvcolormask/
+        https://pseudopencv2.site/utilities/hsvcolormask/
         """
         H, W = hsv.shape[:2]
         px, py = W // 2, H // 2
@@ -229,8 +229,77 @@ class Boss(ABC):
 
         return False, None
 
-    def count_enemies(self, frame830x690: cv2.typing.MatLike | None = None) -> int:
-        return 0
+    def count_enemies(self, frame830x690: cv2.typing.MatLike) -> int:
+        hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
+        # 2) Красная маска в HSV (две «красные» дуги на круге оттенков)
+        # насыщенный яркий красный
+        lower1 = np.array([0, 120, 120])
+        upper1 = np.array([10, 255, 255])
+        lower2 = np.array([170, 120, 120])
+        upper2 = np.array([180, 255, 255])
+        mask = cv2.inRange(hsv, lower1, upper1) | cv2.inRange(hsv, lower2, upper2)
+
+        # 4) Находим контуры и фильтруем по «узкая горизонтальная плашка»
+        cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Пороговые размеры
+        min_h = 5
+        max_h = 8
+        min_w = 50
+        max_w = 70
+
+        candidates = []
+        for c in cnts:
+            x, y, w, h = cv2.boundingRect(c)
+
+            if h < min_h or h > max_h:
+                continue
+            if w < min_w or w > max_w:
+                continue
+
+            if self.debug:
+                cv2.putText(
+                    mask,
+                    f"w={w}, h={h}",
+                    (x, y - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.3,
+                    (255, 255, 255),
+                    1,
+                    cv2.LINE_AA,
+                )
+                cv2.imshow("count_enemies/DBG", mask)
+
+            if w / max(h, 1) < 2.5:  # вытянутость по горизонтали
+                continue
+            area = cv2.contourArea(c)
+            if area / (w * h) < 0.5:  # отсекаем «рваные» и рамки
+                continue
+
+            # Уточнение ориентации: почти горизонтально
+            rect = cv2.minAreaRect(c)
+            angle = rect[-1]
+            angle = angle if angle <= 45 else angle - 90
+            if abs(angle) > 12:  # явные вертикали (факел, огонь) отсекаем
+                continue
+
+            candidates.append((x, y, w, h))
+
+        if self.debug:
+            cv2.putText(
+                mask,
+                f"enemies: {len(candidates)}",
+                (10, 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
+            cv2.imshow("count_enemies/DBG", mask)
+            cv2.waitKey(1)
+
+        return len(candidates)
 
     def _get_frame(self) -> cv2.typing.MatLike:
         return self.controller.device.get_frame2()
