@@ -1,31 +1,20 @@
 from abc import ABC, abstractmethod
+import logging
 import math
+from collections import deque
 import cv2
 import numpy as np
 from db import NE_RECT, NW_RECT, SE_RECT, SW_RECT
 from frames import extract_game
 from model import Direction
 
-
-# cv2.imwrite("minimap24.png", maze.get_frame())
-# frame = maze.get_frame()
-# # TEST is_near_exit
-
-## Define a set where the key is a tuple (x, y)
-# visited_points = set()
-# def mouse_callback(event, x_, y_, flags, param):
-#     global visited_points
-#     if event != cv2.EVENT_LBUTTONDOWN:
-#         return
-#     x, y = x_, y_
-#     visited_points.add((x, y))
-#     print(f"x={x_}, y={y_}")
+logger = logging.getLogger(__name__)
 
 
 class Sensor(ABC):
     max_ray_len = 25
-    W = 350
-    H = 300
+    W = 330
+    H = 270
     ANGLE = {
         Direction.SE: 35.5,
         Direction.SW: 144.5,
@@ -37,7 +26,7 @@ class Sensor(ABC):
         self.first_open_dirs_call = True
         self.mask_colors = mask_colors
         self.debug = debug
-        self._blue_mask = None
+        self._blue_masks = deque(maxlen=7)
         self.last_move_dir = Direction.SE
         self.thresholds = thresholds
         self.steps = 1
@@ -71,28 +60,28 @@ class Sensor(ABC):
         mask = cv2.inRange(hsv, mask_colors["l1"], mask_colors["u1"])
         # Убираем шум, заполняем дырки
         # create a custom diamond-shaped kernel
-        # kernel = np.array(
-        #     [
-        #         [0, 0, 0, 0, 1, 0, 0, 0, 0],
-        #         [0, 0, 1, 1, 1, 1, 1, 0, 0],
-        #         [0, 1, 1, 1, 1, 1, 1, 1, 0],
-        #         [1, 1, 1, 1, 1, 1, 1, 1, 1],
-        #         [0, 1, 1, 1, 1, 1, 1, 1, 0],
-        #         [0, 0, 1, 1, 1, 1, 1, 0, 0],
-        #         [0, 0, 0, 0, 1, 0, 0, 0, 0],
-        #     ],
-        #     dtype=np.uint8,
-        # )
-        kernel = cv2.getStructuringElement(cv2.MORPH_DIAMOND, (7, 7))
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+        kernel = np.array(
+            [
+                [0, 0, 0, 0, 1, 0, 0, 0, 0],
+                [0, 0, 1, 1, 1, 1, 1, 0, 0],
+                [0, 1, 1, 1, 1, 1, 1, 1, 0],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [0, 1, 1, 1, 1, 1, 1, 1, 0],
+                [0, 0, 1, 1, 1, 1, 1, 0, 0],
+                [0, 0, 0, 0, 1, 0, 0, 0, 0],
+            ],
+            dtype=np.uint8,
+        )
+        # kernel = cv2.getStructuringElement(cv2.MORPH_DIAMOND, (7, 7))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=1)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        self._blue_masks.append(mask)
 
-        if self._blue_mask is not None:
-            self._blue_mask = cv2.bitwise_or(self._blue_mask, mask)
-        else:
-            self._blue_mask = mask
+        combined_mask = self._blue_masks[0].copy()
+        for history_mask in list(self._blue_masks)[1:]:
+            combined_mask = cv2.bitwise_or(combined_mask, history_mask)
 
-        return self._blue_mask
+        return combined_mask
 
     def ray_len(
         self,
@@ -333,17 +322,26 @@ class MinimapSensor(Sensor):
         frame,
         mask_colors,
         thresholds=None,
-        minimap=None,
-        use_nogo=True,
         debug=False,
     ):
         super().__init__(frame, mask_colors, thresholds, debug)
-        self._prev_p_xy = None
+        self.p_xy = deque(maxlen=3)
         self.steps = 2
         self.straight_corridor = True
-        self.nogo = list()
-        self.use_nogo = use_nogo
         self.dead_room_detected_at = 0
+        self.nogo_mask = np.ones((self.H, self.W), dtype=np.uint8) * 255
+
+    def get_polygon_nogo(self, p_xy):
+        polygon = np.array(
+            [
+                (p_xy[0] - 8, p_xy[1]),
+                (p_xy[0] + 3, p_xy[1] - 5),
+                (p_xy[0] + 10, p_xy[1] - 1),
+                (p_xy[0] - 5, p_xy[1] + 10),
+            ],
+            dtype=np.int32,
+        )
+        return polygon
 
     def open_dirs(self, frame: cv2.typing.MatLike):
         minimap = self.extract_minimap(frame)
@@ -351,13 +349,11 @@ class MinimapSensor(Sensor):
         lab = self.find_blue_mask(hsv, self.mask_colors["path"])
         pm = self.player_mask(hsv, lab, self.mask_colors["player"])
         p_xy = self.find_largest_contour_centroid(pm)
+        self.p_xy.append(p_xy)
+        lab = cv2.bitwise_and(lab, lab, mask=self.nogo_mask)
 
-        if self.moves < 2:
-            if self.use_nogo and p_xy is not None:
-                self.nogo.append(
-                    ((p_xy[0] - 6, p_xy[1] - 6), (p_xy[0] + 6, p_xy[1] + 6))
-                )
-
+        if self.moves < 3:
+            cv2.fillPoly(self.nogo_mask, [self.get_polygon_nogo(p_xy)], 0)
             return {
                 Direction.NW: False,
                 Direction.SE: True,
@@ -366,59 +362,51 @@ class MinimapSensor(Sensor):
             }
 
         offset = {"NE": (5, -10), "NW": (-11, -10), "SW": (-12, 2), "SE": (3, 1)}
+        ne, nw, se, sw = 0, 0, 0, 0
 
-        ne = 0
-        nw = 0
-        se = 0
-        sw = 0
-
-        if p_xy is None and self._prev_p_xy is not None:
-            p_xy = self._prev_p_xy
+        ne = self.check_rect(lab, p_xy, offset["NE"], NE_RECT)
+        nw = self.check_rect(lab, p_xy, offset["NW"], NW_RECT)
+        se = self.check_rect(lab, p_xy, offset["SE"], SE_RECT)
+        sw = self.check_rect(lab, p_xy, offset["SW"], SW_RECT)
 
         # is_dead_room = False
         # forward_wall_dist, left_wall_dist, right_wall_dist = 0, 0, 0
 
-        if p_xy is not None:
-            ne = self.check_rect(lab, p_xy, self._prev_p_xy, offset["NE"], NE_RECT)
-            nw = self.check_rect(lab, p_xy, self._prev_p_xy, offset["NW"], NW_RECT)
-            se = self.check_rect(lab, p_xy, self._prev_p_xy, offset["SE"], SE_RECT)
-            sw = self.check_rect(lab, p_xy, self._prev_p_xy, offset["SW"], SW_RECT)
+        # if (
+        #     self.dead_room_detected_at == 0
+        #     or (
+        #         self.moves - self.dead_room_detected_at
+        #         > self.dead_room_detection_cd
+        #     )
+        #     or True
+        # ):
+        #     forward_wall_dist = self.ray_len(
+        #         lab,
+        #         *p_xy,
+        #         self.ANGLE[self.last_move_dir],
+        #         minimap if self.debug else None,
+        #     )
+        #     left_wall_dist = self.ray_len(
+        #         lab,
+        #         *p_xy,
+        #         self.ANGLE[self.last_move_dir.left],
+        #         minimap if self.debug else None,
+        #     )
+        #     right_wall_dist = self.ray_len(
+        #         lab,
+        #         *p_xy,
+        #         self.ANGLE[self.last_move_dir.right],
+        #         minimap if self.debug else None,
+        #     )
+        #     is_dead_room = (
+        #         20 <= (left_wall_dist + right_wall_dist) <= 30
+        #         and (6 < left_wall_dist <= 20)
+        #         and (6 < right_wall_dist <= 20)
+        #         and (15 < forward_wall_dist <= 20)
+        #     )
 
-            # if (
-            #     self.dead_room_detected_at == 0
-            #     or (
-            #         self.moves - self.dead_room_detected_at
-            #         > self.dead_room_detection_cd
-            #     )
-            #     or True
-            # ):
-            #     forward_wall_dist = self.ray_len(
-            #         lab,
-            #         *p_xy,
-            #         self.ANGLE[self.last_move_dir],
-            #         minimap if self.debug else None,
-            #     )
-            #     left_wall_dist = self.ray_len(
-            #         lab,
-            #         *p_xy,
-            #         self.ANGLE[self.last_move_dir.left],
-            #         minimap if self.debug else None,
-            #     )
-            #     right_wall_dist = self.ray_len(
-            #         lab,
-            #         *p_xy,
-            #         self.ANGLE[self.last_move_dir.right],
-            #         minimap if self.debug else None,
-            #     )
-            #     is_dead_room = (
-            #         20 <= (left_wall_dist + right_wall_dist) <= 30
-            #         and (6 < left_wall_dist <= 20)
-            #         and (6 < right_wall_dist <= 20)
-            #         and (15 < forward_wall_dist <= 20)
-            #     )
-
-            # if is_dead_room:
-            #     self.dead_room_detected_at = self.moves
+        # if is_dead_room:
+        #     self.dead_room_detected_at = self.moves
 
         result = {
             Direction.NE: ne > self.thresholds["ne"],
@@ -427,51 +415,18 @@ class MinimapSensor(Sensor):
             Direction.SW: sw > self.thresholds["sw"],
         }
 
-        if self.use_nogo:
+        if self.straight_corridor:
+            self.straight_corridor = list(result.values()).count(True) <= 2
             if self.straight_corridor:
-                self.straight_corridor = list(result.values()).count(True) <= 2
-                if self.straight_corridor and p_xy is not None:
-                    self.nogo.append(
-                        ((p_xy[0] - 4, p_xy[1] - 4), (p_xy[0] + 4, p_xy[1] + 4))
-                    )
-
-        if p_xy is not None:
-            self._prev_p_xy = p_xy
-
-        if self.use_nogo:
-            nogo_match = False
-            if not self.straight_corridor:
-                for (x1, y1), (x2, y2) in self.nogo:
-                    if x1 <= p_xy[0] <= x2 and y1 <= p_xy[1] <= y2:
-                        nogo_match = True
-                        break
-
-                if nogo_match:
-                    for d in result.keys():
-                        result[d] = False
-                    result[self.last_move_dir.opposite] = True
+                cv2.fillPoly(self.nogo_mask, [self.get_polygon_nogo(self.p_xy[0])], 0)
 
         if self.debug:
-            cv2.circle(minimap, p_xy, 1, (255, 255, 255), 1)
-            if self.use_nogo:
-                for ng in self.nogo:
-                    cv2.rectangle(minimap, ng[0], ng[1], (0, 0, 255), 1)
-
-                if nogo_match:
-                    cv2.putText(
-                        minimap,
-                        "NOGO",
-                        (10, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1,
-                        (0, 0, 255),
-                        2,
-                    )
+            for p_xy in self.p_xy:
+                cv2.circle(minimap, p_xy, 1, (255, 255, 255), 1)
 
             self.draw_rect(
                 minimap,
                 p_xy,
-                self._prev_p_xy,
                 offset["NE"],
                 NE_RECT,
                 (0, 255, 0) if ne > self.thresholds["ne"] else (0, 0, 255),
@@ -479,7 +434,6 @@ class MinimapSensor(Sensor):
             self.draw_rect(
                 minimap,
                 p_xy,
-                self._prev_p_xy,
                 offset["SW"],
                 SW_RECT,
                 (0, 255, 0) if sw > self.thresholds["sw"] else (0, 0, 255),
@@ -487,7 +441,6 @@ class MinimapSensor(Sensor):
             self.draw_rect(
                 minimap,
                 p_xy,
-                self._prev_p_xy,
                 offset["NW"],
                 NW_RECT,
                 (0, 255, 0) if nw > self.thresholds["nw"] else (0, 0, 255),
@@ -495,7 +448,6 @@ class MinimapSensor(Sensor):
             self.draw_rect(
                 minimap,
                 p_xy,
-                self._prev_p_xy,
                 offset["SE"],
                 SE_RECT,
                 (0, 255, 0) if se > self.thresholds["se"] else (0, 0, 255),
@@ -544,13 +496,13 @@ class MinimapSensor(Sensor):
             cv2.waitKey(1)
 
         # is_dead_room = False
+        logger.debug(f"open_dirs: {result} at move {self.moves}")
         return result
 
     def player_mask(
         self, hsv: cv2.typing.MatLike, lab: cv2.typing.MatLike, masks
     ) -> cv2.typing.MatLike:
-        zone = lab.copy()
-        zone = cv2.dilate(zone, np.ones((5, 5), np.uint8), iterations=1)
+        zone = cv2.dilate(lab.copy(), np.ones((5, 5), np.uint8), iterations=1)
         hsv = cv2.bitwise_and(hsv, hsv, mask=zone)
 
         pm1 = cv2.inRange(hsv, masks["l1"], masks["u1"])
@@ -578,14 +530,8 @@ class MinimapSensor(Sensor):
         cy = int(M["m01"] / M["m00"])
         return (cx, cy)
 
-    def draw_rect(self, frame, p_xy, prev_p_xy, offset, rect, color=(255, 255, 255)):
+    def draw_rect(self, frame, p_xy, offset, rect, color=(255, 255, 255)):
         for x, y in rect:
-            if prev_p_xy is not None:
-                p_xy = (
-                    prev_p_xy[0] if abs(prev_p_xy[0] - p_xy[0]) > 10 else p_xy[0],
-                    prev_p_xy[1] if abs(prev_p_xy[1] - p_xy[1]) > 10 else p_xy[1],
-                )
-
             rect_x = x + p_xy[0] + offset[0]
             rect_y = y + p_xy[1] + offset[1]
 
@@ -594,27 +540,20 @@ class MinimapSensor(Sensor):
 
             frame[rect_y, rect_x] = color
 
-    def check_rect(self, frame, p_xy, prev_p_xy, offset, rect) -> float:
+    def check_rect(self, frame, p_xy, offset, rect) -> float:
         white_count = 0
         for x, y in rect:
-            if prev_p_xy is not None:
-                p_xy = (
-                    prev_p_xy[0] if abs(prev_p_xy[0] - p_xy[0]) > 10 else p_xy[0],
-                    prev_p_xy[1] if abs(prev_p_xy[1] - p_xy[1]) > 10 else p_xy[1],
-                )
-
             rect_x = x + p_xy[0] + offset[0]
             rect_y = y + p_xy[1] + offset[1]
 
             if rect_y >= 300 or rect_x >= 350:
                 continue
 
-            # frame[rect_y, rect_x] = 0
-
             if frame[rect_y, rect_x] == 255:
                 white_count += 1
 
-        return white_count / len(rect) * 100
+        result = white_count / len(rect) * 100
+        return result
 
 
 class FaSensor(Sensor):
@@ -698,82 +637,43 @@ class FaSensor(Sensor):
 
 
 if __name__ == "__main__":
-    from controller import Controller
     from devices.device import Device
 
     device = Device("127.0.0.1", 58526)
     device.connect()
-    controller = Controller(device)
 
     frame = device.get_frame2()
-    sensor = MinimapSensor2(
-        frame, {"path": {"l1": (85, 60, 40), "u1": (140, 255, 255)}}, debug=True
+
+    sensor = MinimapSensor(
+        None,
+        {
+            "player": {
+                "bgr": (132, 113, 156),  # B,G,R
+                "l1": (165, 35, 150),
+                "u1": (175, 85, 180),
+                "l2": (165, 75, 165),
+                "u2": (175, 100, 200),
+            },
+            "path": {
+                "l1": (85, 60, 40),
+                "u1": (140, 255, 255),
+                "l2": (86, 60, 80),
+                "u2": (130, 125, 120),
+            },
+            "wall": {
+                "l1": (0, 0, 0),
+                "u1": (0, 0, 0),
+                "l2": (0, 0, 0),
+                "u2": (0, 0, 0),
+            },
+        },
+        {"ne": 50, "nw": 50, "se": 35, "sw": 30},
+        use_nogo=False,
+        debug=True,
     )
+    sensor.moves = 3
 
-    # while 1:
-    #     frame = device.get_frame2()
-    #     sensor.open_dirs(frame)
-    #     cv2.waitKey(10)
-
-    steps = 5
-    while steps != 0:
-        controller.move_SE()
-        sensor.move(Direction.SE)
-
+    while 1:
         frame = device.get_frame2()
         sensor.open_dirs(frame)
-
-        cv2.waitKey(70)
-        steps -= 1
-
-    cv2.waitKey(0)
-
-    steps = 12
-    while steps != 0:
-        controller.move_SW()
-        sensor.move(Direction.SW)
-
-        frame = device.get_frame2()
-        sensor.open_dirs(frame)
-
-        cv2.waitKey(70)
-        steps -= 1
-
-    cv2.waitKey(0)
-    raise Exception("stop")
-
-    steps = 26
-    while steps != 0:
-        controller.move_NE()
-        sensor.move(Direction.NE)
-
-        frame = device.get_frame2()
-        sensor.open_dirs(frame)
-
-        cv2.waitKey(70)
-        steps -= 1
-
-    cv2.waitKey(0)
-
-    steps = 30
-    while steps != 0:
-        controller.move_SW()
-        sensor.move(Direction.SW)
-
-        frame = device.get_frame2()
-        sensor.open_dirs(frame)
-
-        cv2.waitKey(70)
-        steps -= 1
-    # steps = 41
-    # while steps != 0:
-    #     controller.move_NW()
-    #     sensor.move(Direction.NW)
-
-    #     frame = device.get_frame2()
-    #     sensor.open_dirs(frame)
-
-    #     cv2.waitKey(70)
-    #     steps -= 1
-
-    cv2.waitKey(0)
+        cv2.waitKey(10)

@@ -54,7 +54,6 @@ class BotRunner:
     last_logs_handler: LastLogsHandler
 
     def __init__(self, boss_type: str, debug=False):
-        # check if boss_type in boss_map
         if isinstance(boss_type, str) and boss_type.lower() in self._boss_map:
             boss_class = self._boss_map[boss_type.lower()]
         else:
@@ -62,7 +61,6 @@ class BotRunner:
 
         self.run = 0
         self.failed_runs = 0
-        # counts consecutive failed runs without a success in between
         self.consecutive_failed_runs = 0
         self.time_start = time.time()
         self.debug = debug
@@ -74,10 +72,10 @@ class BotRunner:
         self.explorer = Explorer(
             MazeRH(self.controller, self.boss, debug),
         )
-        logger.info(f"Initialized bot for boss: {boss_type}, debug={debug}")
-
         self.last_logs_handler = LastLogsHandler(30)
         logger.addHandler(self.last_logs_handler)
+        logger.info(f"Initialized bot for boss: {boss_type}, debug={debug}")
+
         if debug:
             logger.setLevel(logging.DEBUG)
             logging.getLogger("detect_location").setLevel(logging.DEBUG)
@@ -85,42 +83,14 @@ class BotRunner:
             logging.getLogger("controller").setLevel(logging.DEBUG)
             logging.getLogger("devices.device").setLevel(logging.DEBUG)
             logging.getLogger("explorer").setLevel(logging.DEBUG)
+            logging.getLogger("sensor").setLevel(logging.DEBUG)
             logging.getLogger("maze_rh").setLevel(logging.DEBUG)
             logging.getLogger("boss.dain").setLevel(logging.DEBUG)
             logging.getLogger("boss.krokust").setLevel(logging.DEBUG)
             logging.getLogger("boss.boss").setLevel(logging.DEBUG)
 
-    def check_main_map(self):
-        monetia = cv2.imread("resources/monetia.png", cv2.IMREAD_COLOR)
-        monetia_box, _ = find_tpl(self.boss._get_frame(), monetia, score_threshold=0.9)
-        if monetia_box:
-            self.controller._tap((monetia_box["x"], monetia_box["y"]))
-            time.sleep(3)
-
-    def check_town(self):
-        pub = cv2.imread("resources/pub3.png", cv2.IMREAD_COLOR)
-        pub_box, _ = find_tpl(self.boss._get_frame(), pub, score_threshold=0.9)
-        if pub_box:
-            self.controller._tap((pub_box["x"], pub_box["y"]))
-            time.sleep(0.5)
-            self.controller._tap((1055, 320))  # hit the enter button
-            time.sleep(3)
-
-    def get_runs_per_hour(self):
-        elapsed_time = time.time() - self.time_start
-        if elapsed_time == 0:
-            return 0.0
-        runs_per_hour = (self.run / elapsed_time) * 3600
-        return runs_per_hour
-
-    def get_total_time(self):
-        elapsed_time = time.time() - self.time_start
-        hours = int(elapsed_time // 3600)
-        minutes = int((elapsed_time % 3600) // 60)
-        seconds = int(elapsed_time % 60)
-        return f"{hours:02}:{minutes:02}:{seconds:02}"
-
     def go(self, wait_failed_combat=False):
+        logger.info(f"Starting bot... wait_failed_combat={wait_failed_combat}")
         # ---------------------- Main loop --------------------------
         current_run = 0
         while True:
@@ -163,7 +133,7 @@ class BotRunner:
             )
             if reason != "success":
                 logger.info(
-                    f"❌ - Run #{self.run:03d} - t:{time.time() - t0:.1f}s - m:{moves} - r:{reason}"
+                    f"❌ #{self.run:03d} t:{time.time() - t0:.1f}s m:{moves:02d} r:{reason}"
                 )
                 save_image(
                     self.boss._get_frame(),
@@ -184,19 +154,17 @@ class BotRunner:
                 self.controller.move_SW(self.boss.enter_room_clicks)
 
             # wait for boss room
-            if not wait_for_boss_popup(
-                self.boss._get_frame, timeout_s=10, debug=self.debug
-            ):
+            if not wait_for_boss_popup(self.boss._get_frame, timeout_s=10):
                 dir = dir.label if dir is not None else "None"
                 logger.info(
-                    f"❌ - Run #{self.run:03d} - t:{time.time() - t0:.1f}s - m:{moves} - r:fake exit dir:{dir}"
+                    f"❌ #{self.run:03d} t:{time.time() - t0:.1f}s m:{moves:02d} r:fake exit dir:{dir}"
                 )
                 save_image(
                     self.boss._get_frame(),
                     f"fails/fake-exit_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s)({dir}).png",
                 )
                 if type(self.boss) is BossMine:
-                    winsound.Beep(2000, 50)
+                    winsound.Beep(2000, 70)
                     raise
                 self.boss.back()
                 self.failed_runs += 1
@@ -212,9 +180,7 @@ class BotRunner:
             self.controller.wait_loading()
             # close summary
             if not wait_for(
-                "resources/figth_end.png",
-                lambda: extract_game(self.boss._get_frame()),
-                debug=self.debug,
+                "resources/figth_end.png", lambda: extract_game(self.boss._get_frame())
             ):
                 save_image(
                     self.boss._get_frame(),
@@ -222,7 +188,7 @@ class BotRunner:
                 )
                 logger.warning(f"⚠️ figth_end not found, hp left: {hp}%  ")
                 if wait_failed_combat:
-                    winsound.Beep(5000, 300)
+                    winsound.Beep(2000, 70)
                     cv2.imshow("frame", self.boss._get_frame())
                     cv2.waitKey(0)
                     cv2.destroyAllWindows()
@@ -235,7 +201,7 @@ class BotRunner:
             if not self.boss.open_chest(dir) and type(self.boss) is BossDain:
                 logger.warning("⚠️ open chest fail")
                 if wait_failed_combat:
-                    winsound.Beep(5000, 300)
+                    winsound.Beep(2000, 70)
                     cv2.imshow("frame", self.boss._get_frame())
                     cv2.waitKey(0)
                     cv2.destroyAllWindows()
@@ -250,10 +216,38 @@ class BotRunner:
             self.consecutive_failed_runs = 0
             current_run += 1
             self.run += 1
-            logger.info(
-                f"✅ - Run #{self.run:03d} - t:{time.time() - t0:.1f}s - m:{moves} - cf:{self.consecutive_failed_runs}"
-            )
+            logger.info(f"✅ #{self.run:03d} t:{time.time() - t0:.1f}s m:{moves}")
             self.boss.back()
+
+    def check_main_map(self):
+        monetia = cv2.imread("resources/monetia.png", cv2.IMREAD_COLOR)
+        monetia_box, _ = find_tpl(self.boss._get_frame(), monetia, score_threshold=0.9)
+        if monetia_box:
+            self.controller._tap((monetia_box["x"], monetia_box["y"]))
+            time.sleep(3)
+
+    def check_town(self):
+        pub = cv2.imread("resources/pub3.png", cv2.IMREAD_COLOR)
+        pub_box, _ = find_tpl(self.boss._get_frame(), pub, score_threshold=0.9)
+        if pub_box:
+            self.controller._tap((pub_box["x"], pub_box["y"]))
+            time.sleep(0.5)
+            self.controller._tap((1055, 320))  # hit the enter button
+            time.sleep(3)
+
+    def get_runs_per_hour(self):
+        elapsed_time = time.time() - self.time_start
+        if elapsed_time == 0:
+            return 0.0
+        runs_per_hour = (self.run / elapsed_time) * 3600
+        return runs_per_hour
+
+    def get_total_time(self):
+        elapsed_time = time.time() - self.time_start
+        hours = int(elapsed_time // 3600)
+        minutes = int((elapsed_time % 3600) // 60)
+        seconds = int(elapsed_time % 60)
+        return f"{hours:02}:{minutes:02}:{seconds:02}"
 
     def __del__(self):
         cv2.destroyAllWindows()
@@ -272,8 +266,9 @@ if __name__ == "__main__":
         wait_failed_combat = len(sys.argv) > 2 and sys.argv[2].lower() == "true"
         debug = False
     else:
-        boss_arg = "troll"  # krokust | dain | bhalor | khanel | delingh | elvira | mine | troll
-        debug = False
+        # krokust | dain | bhalor | khanel | delingh | elvira | mine | troll
+        boss_arg = "dain"
+        debug = True
         wait_failed_combat = True
 
     BotRunner(boss_arg, debug).go(wait_failed_combat)

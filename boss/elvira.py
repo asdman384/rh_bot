@@ -7,7 +7,7 @@ from controller import Controller
 from db import FA_BHALOR
 from detect_location import find_tpl
 from model import Direction
-from sensor import FaSensor
+from sensor import FaSensor, MinimapSensor
 
 
 class BossElvira(Boss):
@@ -26,6 +26,15 @@ class BossElvira(Boss):
         self.exit_tpl_ne = cv2.imread("resources/elvira/ne.png")
 
     def init_camera(self) -> None:
+        # self.sensor = MinimapSensor(
+        #     None,
+        #     self.minimap_masks,
+        #     {"ne": 50, "nw": 50, "se": 35, "sw": 30},
+        #     debug=self.debug or True,
+        # )
+        # self.ensure_movement = True
+        # self.controller.move_E()
+        # return
         self.sensor = FaSensor(
             None,
             None,

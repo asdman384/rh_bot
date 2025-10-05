@@ -302,6 +302,7 @@ class GameBotService:
             "khanel",
             "delingh",
             "elvira",
+            "troll",
         }
 
         if not boss_arg or boss_arg not in valid_bosses:
@@ -310,7 +311,7 @@ class GameBotService:
                 [
                     ["/start_game_bot dain", "/start_game_bot bhalor"],
                     ["/start_game_bot khanel", "/start_game_bot delingh"],
-                    ["/start_game_bot elvira"],
+                    ["/start_game_bot elvira", "/start_game_bot troll"],
                 ],
                 resize_keyboard=True,
             )

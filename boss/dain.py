@@ -9,7 +9,7 @@ from controller import Controller
 from db import FA_BHALOR
 from detect_location import wait_for
 from model import Direction
-from sensor import FaSensor
+from sensor import FaSensor, MinimapSensor
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class BossDain(Boss):
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
 
-        self.max_moves = 100
+        self.max_moves = 150
         self.enter_room_clicks = 10
         self.no_combat_minions = True
         self.exit_check_type = "tpl"  # 'mask' | 'tpl'
@@ -43,10 +43,10 @@ class BossDain(Boss):
         self.minimap_masks = {
             "player": {
                 "bgr": (132, 113, 156),  # B,G,R
-                "l1": (0, 0, 0),
-                "u1": (0, 0, 0),
-                "l2": (0, 0, 0),
-                "u2": (0, 0, 0),
+                "l1": (165, 35, 150),
+                "u1": (175, 85, 180),
+                "l2": (165, 75, 165),
+                "u2": (175, 100, 200),
             },
             "path": {
                 "l1": (85, 60, 40),
@@ -63,18 +63,32 @@ class BossDain(Boss):
         }
 
     def init_camera(self) -> None:
+        # self.controller.move_E()
+        # time.sleep(0.2)
+        # self.sensor = FaSensor(
+        #     None,
+        #     None,
+        #     self.fa_dir_threshold,
+        #     debug=self.debug,
+        # )
+        # self.sensor.dir_cells = FA_BHALOR
+        # return
+        self.sensor = MinimapSensor(
+            None,
+            self.minimap_masks,
+            {"ne": 50, "nw": 50, "se": 35, "sw": 30},
+            debug=self.debug,  # or True,
+        )
+        self.ensure_movement = True
         self.controller.move_E()
         time.sleep(0.2)
-        self.sensor = FaSensor(
-            None,
-            None,
-            self.fa_dir_threshold,
-            debug=self.debug,
-        )
-        self.sensor.dir_cells = FA_BHALOR
+        self.controller.move_SE()
+
+    def count_enemies(self, frame830x690: cv2.typing.MatLike) -> int:
+        return 0
 
     def start_fight(self, dir: Direction) -> int:
-        logger.debug("Fighting boss Dain...")
+        logger.debug(f"Fighting boss Dain... dir: {dir}")
         self.controller.skill_3(
             (540, 360) if dir == Direction.SW else (640, 290)
         )  # slide

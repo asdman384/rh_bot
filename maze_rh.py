@@ -110,8 +110,7 @@ class MazeRH:
         diff = True
         if self._last_frame is not None:
             bytess = bytes_hamming(self._last_frame, newFrame)
-            if self.debug:
-                print(f"Moved {d.label}, diff bits: {bytess} > {THRESHOLD_BITS}")
+            logger.debug(f"Moved {d}, diff bits: {bytess} > {THRESHOLD_BITS}")
             diff = bytess >= THRESHOLD_BITS
 
         self._last_frame = newFrame
@@ -127,7 +126,7 @@ class MazeRH:
                 and (self.moves - self.last_combat > 3)
             ):
                 time.sleep(0.5)
-                print("Using skill 4")
+                logger.debug("Using skill 4")
                 self.controller.skill_4()  # multi arrow
                 self.controller.skill_4()  # multi arrow
                 time.sleep(1)

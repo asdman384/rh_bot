@@ -118,7 +118,6 @@ class Controller:
             wait_appearance=wait_appearance,
             timeout=timeout,
             retry=self.yes,
-            debug=self.debug,
         )
 
     def full_back(self, close_game=False):

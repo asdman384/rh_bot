@@ -210,7 +210,6 @@ class Boss(ABC):
             self.exit_tpl_sw,
             [1.0],
             score_threshold=self.exit_tpl_sw_threshold,
-            debug=self.debug,
         )
         if box is not None:
             return True, Direction.SW
@@ -222,7 +221,6 @@ class Boss(ABC):
             self.exit_tpl_ne,
             [1.0],
             score_threshold=self.exit_tpl_ne_threshold,
-            debug=self.debug,
         )
         if box is not None:
             return True, Direction.NE
@@ -268,7 +266,6 @@ class Boss(ABC):
                     1,
                     cv2.LINE_AA,
                 )
-                cv2.imshow("count_enemies/DBG", mask)
 
             if w / max(h, 1) < 2.5:  # вытянутость по горизонтали
                 continue

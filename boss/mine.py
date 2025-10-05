@@ -40,7 +40,7 @@ class BossMine(Boss):
         super().__init__(controller, debug)
         self._dist_thresh_px = 400
         self.max_moves = 1000
-        self.enter_room_clicks = 5
+        self.enter_room_clicks = 6
         self.map_xy = None
         self.no_combat_minions = True
         self.exit_check_type = "tpl"  # 'mask' | 'tpl'
@@ -50,7 +50,6 @@ class BossMine(Boss):
         self.enemy1 = cv2.imread("resources/mine/enemy1.png")
         self.enemy1_ne = cv2.imread("resources/mine/enemy1-ne.png")
         self.enemy2 = cv2.imread("resources/mine/enemy2.png")
-        self.debug = True
 
     def init_camera(self) -> None:
         self.sensor = MinimapSensor(
@@ -62,6 +61,7 @@ class BossMine(Boss):
         self.controller.move_E()
 
     def count_enemies(self, frame830x690: cv2.typing.MatLike) -> int:
+        return 0
         px, py = 830 // 2, 690 // 2
         box, score = find_tpl(
             frame830x690, self.enemy1, [1.0], score_threshold=0.8, debug=self.debug
@@ -149,7 +149,7 @@ class BossMine(Boss):
             route.pop()()
             step += 1
             if step < 12:
-                time.sleep(0.1)
+                time.sleep(0.07)
                 continue
             if wait_for(fight_end, lambda: extract_game(self._get_frame()), 0.6):
                 self.controller.wait_loading(timeout=30)
@@ -233,3 +233,9 @@ class BossMine(Boss):
 
     def fix_disaster(self):
         time.sleep(1)  # wait for any animation to finish
+
+    def fix_blockage(self):
+        time.sleep(0.2)
+        self.controller.attack()
+        self.controller.attack()
+        time.sleep(1)

@@ -48,7 +48,6 @@ class BossDelingh(Boss):
             None,
             self.minimap_masks,
             {"ne": 50, "nw": 50, "se": 35, "sw": 30},
-            use_nogo=False,
             # debug=True,
             debug=self.debug,
         )

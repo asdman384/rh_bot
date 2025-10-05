@@ -94,7 +94,9 @@ class Explorer:
             # Проверка выхода
             exit, dir = self.maze.is_exit()
             if exit:
-                logger.debug(f"[OK] Exit reached at {self.pos} in {steps} steps.")
+                logger.debug(
+                    f"[OK] Exit reached at {self.pos} in {steps} steps. dir: {dir}"
+                )
                 return "success", steps, dir
 
             # Выбрать локальный ход (в ещё не посещённого соседа)
