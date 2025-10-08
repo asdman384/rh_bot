@@ -151,7 +151,11 @@ def wait_loading(get_frame, wait_appearance=3, timeout=30, retry=None, debug=Fal
                     print(
                         f"disappeared loader after {time.time() - t1}s"
                     ) if debug else None
-                    # TODO: check network connection and retry if tpl found
+
+                    if find_tpl(extract_game(frame), net_error)[0] is not None:
+                        retry() if retry is not None else None
+                        wait_loading(get_frame, wait_appearance, timeout, retry, debug)
+
                     return True
             print(f"Loader still exists after {timeout}s") if debug else None
 

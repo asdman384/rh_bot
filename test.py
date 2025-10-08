@@ -71,6 +71,7 @@ device.connect()
 # cv2.setMouseCallback("empty", mouse_callback)
 
 x, y = 557, 370
+
 def mouse_callback(event, x_, y_, flags, param):
     global x, y
     if event != cv2.EVENT_LBUTTONDOWN:
@@ -85,70 +86,6 @@ cv2.setMouseCallback("frame", mouse_callback)
 cv2.waitKey(0)
 device.close()
 
-
-# i = 0
-# while 1:
-#     i += 1
-#     frame = device.get_frame2().copy()
-#     cv2.imshow("frame", frame)
-#     cv2.imwrite(f"images/{i}.png", frame)
-#     cv2.waitKey(0)
-
-
-# for _ in range(38):
+# for _ in range(88):
 #     device.click((x, y))
-#     time.sleep(0.04)
-
-
-# DEAD CELL
-# dirs_angle = {
-#     Direction.SE: 35.5,
-#     Direction.SW: 144.5,
-#     Direction.NW: 215.5,
-#     Direction.NE: 324.5,
-# }
-# # Define a custom mask square of size 12x9
-
-# dx = math.cos(math.radians(dirs_angle[Direction.NE]))
-# dy = math.sin(math.radians(dirs_angle[Direction.NE]))
-# start_point = (9, 13)
-# for i in range(13):
-#     x = int(start_point[0] + round(i * dx))
-#     y = int(start_point[1] + round(i * dy))
-#     if 0 <= x < custom_mask.shape[1] and 0 <= y < custom_mask.shape[0]:
-#         custom_mask[y, x] = 255
-
-# dx = math.cos(math.radians(dirs_angle[Direction.NW]))
-# dy = math.sin(math.radians(dirs_angle[Direction.NW]))
-# start_point = (9, 13)
-# for i in range(13):
-#     x = int(start_point[0] + round(i * dx))
-#     y = int(start_point[1] + round(i * dy))
-#     if 0 <= x < custom_mask.shape[1] and 0 <= y < custom_mask.shape[0]:
-#         custom_mask[y, x] = 255
-
-# dx = math.cos(math.radians(dirs_angle[Direction.NE]))
-# dy = math.sin(math.radians(dirs_angle[Direction.NE]))
-# start_point = (0, 7)
-# for i in range(13):
-#     x = int(start_point[0] + round(i * dx))
-#     y = int(start_point[1] + round(i * dy))
-#     if 0 <= x < custom_mask.shape[1] and 0 <= y < custom_mask.shape[0]:
-#         custom_mask[y, x] = 255
-
-# dx = math.cos(math.radians(dirs_angle[Direction.NW]))
-# dy = math.sin(math.radians(dirs_angle[Direction.NW]))
-# start_point = (19, 6)
-# for i in range(13):
-#     x = int(start_point[0] + round(i * dx))
-#     y = int(start_point[1] + round(i * dy))
-#     if 0 <= x < custom_mask.shape[1] and 0 <= y < custom_mask.shape[0]:
-#         custom_mask[y, x] = 255
-
-# custom_mask = np.ones((100, 100), dtype=np.uint8) * 0
-# pts = np.array([[10, 5], [20, 30], [50, 10], [10, 5]], np.int32)
-# cv2.polylines(custom_mask, [pts], False, 255, 1)
-
-# cv2.imwrite("Custom Mask.png", custom_mask)
-
-# raise
+#     time.sleep(0.035)

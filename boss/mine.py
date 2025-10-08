@@ -211,7 +211,7 @@ class BossMine(Boss):
 
     def portal(self) -> None:
         mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
-        mine_box, _ = find_tpl(self._get_frame(), mine, score_threshold=0.34)
+        mine_box, _ = find_tpl(self._get_frame(), mine, score_threshold=0.335)
 
         if mine_box is None:
             raise "mine_box problem"

@@ -14,6 +14,8 @@ from boss import (
     BossMine,
     BossKrokust,
     BossTroll,
+    BossVolcano,
+    BossShaman,
 )
 from bot_utils.logger_memory import LastLogsHandler
 from bot_utils.screenshoter import save_image
@@ -49,6 +51,8 @@ class BotRunner:
         "delingh": BossDelingh,
         "elvira": BossElvira,
         "troll": BossTroll,
+        "volcano": BossVolcano,
+        "shaman": BossShaman,
         "mine": BossMine,
     }
     last_logs_handler: LastLogsHandler
@@ -98,6 +102,7 @@ class BotRunner:
                 logger.error(
                     f"Too many consecutive failed runs: {self.consecutive_failed_runs}. Stopping bot."
                 )
+                self.controller.device.force_stop_rogue_hearts()
                 raise Exception("Too many consecutive failed runs")
 
             t0 = time.time()
@@ -135,12 +140,16 @@ class BotRunner:
                 logger.info(
                     f"❌ #{self.run:03d} t:{time.time() - t0:.1f}s m:{moves:02d} r:{reason}"
                 )
+                # save_image(
+                #     self.boss.sensor.extract_minimap(self.boss._get_frame()),
+                #     f"images/minimap/dain/{time.strftime('%H-%M-%S')}.png",
+                # )
                 save_image(
                     self.boss._get_frame(),
                     f"fails/{reason}_{time.strftime('%H-%M-%S')}(t-{time.time() - t0:.1f}s).png",
                 )
                 if type(self.boss) is BossMine:
-                    winsound.Beep(2000, 50)
+                    winsound.Beep(2000, 70)
                     raise
                 self.boss.back()
                 self.failed_runs += 1
@@ -171,6 +180,8 @@ class BotRunner:
                 self.consecutive_failed_runs += 1
                 continue
 
+            self.controller.yes()
+            time.sleep(0.1)
             self.controller.yes()
             time.sleep(0.1)
 
@@ -217,6 +228,10 @@ class BotRunner:
             current_run += 1
             self.run += 1
             logger.info(f"✅ #{self.run:03d} t:{time.time() - t0:.1f}s m:{moves}")
+            # save_image(
+            #     self.boss.sensor.extract_minimap(self.boss._get_frame()),
+            #     f"images/minimap/dain/{time.strftime('%H-%M-%S')}.png",
+            # )
             self.boss.back()
 
     def check_main_map(self):
@@ -250,6 +265,7 @@ class BotRunner:
         return f"{hours:02}:{minutes:02}:{seconds:02}"
 
     def __del__(self):
+        winsound.Beep(2000, 70)
         cv2.destroyAllWindows()
         if hasattr(self, "last_logs_handler"):
             logger.removeHandler(self.last_logs_handler)
@@ -266,8 +282,8 @@ if __name__ == "__main__":
         wait_failed_combat = len(sys.argv) > 2 and sys.argv[2].lower() == "true"
         debug = False
     else:
-        # krokust | dain | bhalor | khanel | delingh | elvira | mine | troll
-        boss_arg = "dain"
+        # krokust | dain | bhalor | khanel | delingh | elvira | mine | troll | volcano | shaman
+        boss_arg = "shaman"
         debug = True
         wait_failed_combat = True
 

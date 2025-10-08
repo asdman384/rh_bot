@@ -7,22 +7,14 @@ import cv2
 from boss.boss import Boss, extract_boss_health, measure_fill_px
 from bot_utils.screenshoter import save_image
 from controller import Controller
-from db import FA_BHALOR
 from detect_location import wait_for
 from model import Direction
-from sensor import FaSensor, MinimapSensor
+from sensor import MinimapSensor
 
 logger = logging.getLogger(__name__)
 
 
-class BossDain(Boss):
-    initial_minimap_open_dirs2 = {
-        Direction.NE.label: False,
-        Direction.NW.label: False,
-        Direction.SE.label: True,
-        Direction.SW.label: False,
-    }
-
+class BossVolcano(Boss):
     def __init__(self, controller: Controller, debug: bool = False) -> None:
         super().__init__(controller, debug)
 
@@ -33,12 +25,6 @@ class BossDain(Boss):
         self.exit_tpl_sw_threshold = 0.57
         self.exit_tpl_sw = cv2.imread("resources/dain/sw.png")
         self.exit_tpl_ne = cv2.imread("resources/dain/ne.png")
-        self.fa_dir_threshold = {
-            "ne": 30,
-            "nw": 30,
-            "se": 30,
-            "sw": 30,
-        }
         self.ensure_movement = False
 
         self.minimap_masks = {
@@ -64,16 +50,6 @@ class BossDain(Boss):
         }
 
     def init_camera(self) -> None:
-        # self.controller.move_E()
-        # time.sleep(0.2)
-        # self.sensor = FaSensor(
-        #     None,
-        #     None,
-        #     self.fa_dir_threshold,
-        #     debug=self.debug,
-        # )
-        # self.sensor.dir_cells = FA_BHALOR
-        # return
         self.sensor = MinimapSensor(
             None,
             self.minimap_masks,
@@ -89,6 +65,7 @@ class BossDain(Boss):
         return 0
 
     def start_fight(self, dir: Direction) -> int:
+        raise 'NotImplementedError()'
         logger.debug(f"Fighting boss Dain... dir: {dir}")
         self.controller.skill_3(
             (540, 360) if dir == Direction.SW else (640, 290)
@@ -175,5 +152,6 @@ class BossDain(Boss):
     def portal(self) -> None:
         self.controller._tap((1000, 630))  # page +1
         time.sleep(0.4)
-        self.controller._tap((1150, 450))  # select Dain
+        self.controller._tap((1150, 550))  # select Volcano
+
         time.sleep(2.5)

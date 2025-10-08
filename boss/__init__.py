@@ -6,6 +6,9 @@ from .elvira import BossElvira
 from .mine import BossMine
 from .krokust import BossKrokust
 from .troll import BossTroll
+from .volcano import BossVolcano
+from .shaman import BossShaman
+from .trees import BossTrees
 from .boss import Boss
 
 __all__ = [
@@ -18,4 +21,7 @@ __all__ = [
     "BossMine",
     "BossKrokust",
     "BossTroll",
+    "BossVolcano",
+    "BossShaman",
+    "BossTrees",
 ]

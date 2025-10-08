@@ -4,7 +4,7 @@ import math
 from collections import deque
 import cv2
 import numpy as np
-from db import NE_RECT, NW_RECT, SE_RECT, SW_RECT
+from db import FA_BHALOR, NE_RECT, NW_RECT, SE_RECT, SW_RECT
 from frames import extract_game
 from model import Direction
 
@@ -418,6 +418,8 @@ class MinimapSensor(Sensor):
         if self.straight_corridor:
             self.straight_corridor = list(result.values()).count(True) <= 2
             if self.straight_corridor:
+                # TODO: check distance between p_xy[0] and last points
+                # do not update nogo_mask if the distance too low
                 cv2.fillPoly(self.nogo_mask, [self.get_polygon_nogo(self.p_xy[0])], 0)
 
         if self.debug:
@@ -668,12 +670,14 @@ if __name__ == "__main__":
             },
         },
         {"ne": 50, "nw": 50, "se": 35, "sw": 30},
-        use_nogo=False,
         debug=True,
     )
     sensor.moves = 3
 
+    fa_sensor = FaSensor(None, None, {"ne": 30, "nw": 30, "se": 30, "sw": 30}, True)
+    fa_sensor.dir_cells = FA_BHALOR
+
     while 1:
         frame = device.get_frame2()
-        sensor.open_dirs(frame)
+        fa_sensor.open_dirs(frame)
         cv2.waitKey(10)

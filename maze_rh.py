@@ -153,13 +153,13 @@ class MazeRH:
     def _get_frame_fa(self) -> cv2.typing.MatLike:
         if self.boss.sensor.fa:
             self.controller.click(self.controller.skill_1_point)
-            time.sleep(0.1)
+            time.sleep(0.105)
 
         frame = self.get_frame()
 
         if self.boss.sensor.fa:
             self.controller.click(self.controller.skill_1_point_cancel)
-            time.sleep(0.055)
+            time.sleep(0.06)
 
         return frame
 
@@ -203,12 +203,13 @@ if __name__ == "__main__":
         BossKhanel,
         BossBhalor,
         BossKrokust,
+        BossShaman,
     )
 
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
-    boss = BossDelingh(controller, True)
+    boss = BossMine(controller, True)
     maze = MazeRH(controller, boss, True)
     boss.init_camera()
     boss.sensor.use_nogo = False
@@ -219,12 +220,13 @@ if __name__ == "__main__":
     # raise
     # # TEST is_near_exit
     while 1:
-        maze._sense()
-        # frame830x690 = extract_game(maze.get_frame())
-        # frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
-        # res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
+        # maze._sense()
+        frame830x690 = extract_game(maze.get_frame())
+        frame830x690hsv = cv2.cvtColor(frame830x690, cv2.COLOR_BGR2HSV)
+        res, _ = boss.is_near_exit(frame830x690hsv, frame830x690)
         # _enemies = maze._count_enemies(frame830x690hsv, frame830x690)
-        # print(res, _, _enemies)
+        print(res, _)
+        cv2.waitKey(10)
 
     # # TEST is_near_exit thresolds
     # frame = extract_game(device.get_frame2())

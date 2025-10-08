@@ -111,6 +111,7 @@ class Boss(ABC):
         time.sleep(2.8)
         self.controller.move_W() if dir == Direction.SW else self.controller.move_N()
         time.sleep(0.5)
+        self.controller.move_SW() if dir == Direction.SW else self.controller.move_NE()
         return True
 
     def is_near_exit(
