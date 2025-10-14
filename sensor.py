@@ -415,11 +415,13 @@ class MinimapSensor(Sensor):
             Direction.SW: sw > self.thresholds["sw"],
         }
 
+        self.straight_corridor = self.straight_corridor and (
+            list(result.values()).count(True) <= 2
+        )
         if self.straight_corridor:
-            self.straight_corridor = list(result.values()).count(True) <= 2
-            if self.straight_corridor:
-                # TODO: check distance between p_xy[0] and last points
-                # do not update nogo_mask if the distance too low
+            # check distance between p_xy[0] and last point
+            # do not update nogo_mask if the distance less than 3
+            if cv2.norm(np.array(self.p_xy[0]) - np.array(self.p_xy[-1])) > 3:
                 cv2.fillPoly(self.nogo_mask, [self.get_polygon_nogo(self.p_xy[0])], 0)
 
         if self.debug:

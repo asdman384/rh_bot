@@ -108,7 +108,10 @@ class Controller:
     def confirm(self):
         return self._tap((740, 530))
 
-    def attack(self) -> None:
+    def attack(self, target: cv2.typing.Point | None = None) -> None:
+        if target is not None:
+            self._tap(target)
+            time.sleep(0.1)
         self.device.device.shell("input tap 1100 450", decode=False)
         time.sleep(0.2)
 

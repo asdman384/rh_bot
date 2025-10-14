@@ -110,7 +110,7 @@ class MazeRH:
         diff = True
         if self._last_frame is not None:
             bytess = bytes_hamming(self._last_frame, newFrame)
-            logger.debug(f"Moved {d}, diff bits: {bytess} > {THRESHOLD_BITS}")
+            logger.debug(f"Measuring move to {d}, diff bits: {bytess} > {THRESHOLD_BITS}")
             diff = bytess >= THRESHOLD_BITS
 
         self._last_frame = newFrame
@@ -209,6 +209,9 @@ if __name__ == "__main__":
     device = Device("127.0.0.1", 58526)
     device.connect()
     controller = Controller(device)
+    controller.attack((660, 290))
+    raise
+    controller.attack((610, 330))
     boss = BossMine(controller, True)
     maze = MazeRH(controller, boss, True)
     boss.init_camera()

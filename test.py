@@ -20,13 +20,11 @@ device.connect()
 #     cv2.waitKey(10)
 
 # sw_combat_pos = cv2.imread("resources/krokust/ne_combat_pos.png")
-# box = None
+# boss_chest = cv2.imread("resources/boss_chest.png", cv2.IMREAD_COLOR)
 # while 1:
-#     box, _ = find_tpl(
-#         device.get_frame2(), sw_combat_pos, score_threshold=0.8, debug=True
-#     )
+#     box, _ = find_tpl(device.get_frame2(), boss_chest, score_threshold=0.69, debug=True)
 
-#     print(box, _) if box is not None else None
+#     print(box, _)
 
 # raise
 # SIZE = 10
@@ -71,6 +69,7 @@ device.connect()
 # cv2.setMouseCallback("empty", mouse_callback)
 
 x, y = 557, 370
+
 
 def mouse_callback(event, x_, y_, flags, param):
     global x, y

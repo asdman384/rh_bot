@@ -144,9 +144,7 @@ class Explorer:
                 # Не удалось сделать ход (ложное срабатывание can_move)
                 # Предыдущая позиция не меняется, prev_dir не меняется
                 self.map.mark_edge(self.pos, d, False)
-                logger.debug(
-                    f"[WARN] Move {d.label} from {self.pos} failed unexpectedly."
-                )
+                logger.debug(f"[WARN] Move {d} from {self.pos} failed unexpectedly.")
 
             # img = draw_map_memory(self.map)
             # cv2.imshow("map", img)
@@ -162,6 +160,7 @@ class Explorer:
 
     def _move(self, d: Direction) -> bool:
         isMoved = self.maze.move(d)
+        logger.debug(f"Moving attempt {d} from {self.pos}, success: {isMoved}")
         if isMoved:
             self.pos = (self.pos[0] + d.dx, self.pos[1] + d.dy)
         return isMoved
@@ -263,5 +262,5 @@ if __name__ == "__main__":
     t0 = time.time()
     isSucces, moves, dir = explorer.run(boss.max_moves, True)
     print(
-        f"Run Explorer finished with: {isSucces}, moves taken: {moves}, time: {time.time() - t0:.1f}s, dir: {dir.label if dir is not None else None}"
+        f"Run Explorer finished with: {isSucces}, moves taken: {moves}, time: {time.time() - t0:.1f}s, dir: {dir}"
     )

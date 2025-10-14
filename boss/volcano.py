@@ -4,10 +4,9 @@ import time
 
 import cv2
 
-from boss.boss import Boss, extract_boss_health, measure_fill_px
-from bot_utils.screenshoter import save_image
+from boss.boss import Boss
 from controller import Controller
-from detect_location import wait_for
+from detect_location import find_tpl
 from model import Direction
 from sensor import MinimapSensor
 
@@ -65,88 +64,89 @@ class BossVolcano(Boss):
         return 0
 
     def start_fight(self, dir: Direction) -> int:
-        raise 'NotImplementedError()'
-        logger.debug(f"Fighting boss Dain... dir: {dir}")
+        logger.debug(f"Fighting boss Volcano... dir: {dir}")
         self.controller.skill_3(
-            (540, 360) if dir == Direction.SW else (640, 290)
-        )  # slide
-        time.sleep(2)
+            (730, 360) if dir == Direction.SW else (640, 430)
+        )  # Somersault
+        time.sleep(3)
         self.controller.skill_3()  # elven blessing
         time.sleep(1.5)
 
-        ne_routine = [
+        routine = [
             self._attk_focus_arrow,  # piercing arrow
+            lambda: self._attk_focus_arrow((800, 470)),  # focus arrow
+            lambda: self._attk_barrage((800, 470)),  # barrage
+            lambda: time.sleep(1.5),
+            lambda: self._attk_barrage((800, 470)),  # barrage
+            lambda: time.sleep(3),
+            self.controller.skill_3,  # elven blessing
+            lambda: time.sleep(5),
+            lambda: self.controller.skill_3(
+                (690, 330) if dir == Direction.SW else (590, 393)
+            ),  # Somersault
+            lambda: time.sleep(3),
+            self.controller.move_SE,
+            lambda: time.sleep(2),
+            self._attk_focus_arrow,  # piercing arrow
+            lambda: time.sleep(2),
             self._attk_focus_arrow,  # focus arrow
-            lambda: self._attk_barrage((730, 300)),  # grenade
-            lambda: self._attk_barrage((690, 320)),  # barrage
-        ]
-
-        sw_routine = [
-            lambda: self._attk_barrage((530, 430)),  # grenade
+            lambda: time.sleep(4),
+            self.controller.skill_4,  # slide
+            lambda: time.sleep(2),
+            self.controller.attack,  # attack
+            lambda: time.sleep(1.5),
+            self._attk_barrage,  # grenade
             self._attk_barrage,  # barrage
             self._attk_focus_arrow,  # piercing arrow
-            lambda: self._attk_focus_arrow((480, 470)),  # focus arrow
+            lambda: self._attk_focus_arrow(
+                (540, 430) if dir == Direction.SW else (770, 260)
+            ),  # focus arrow
         ]
 
-        routine = ne_routine if dir == Direction.NE else sw_routine
-        hp, prev_hp = 100, 100
+        hp = 100
         while hp > 0 and len(routine) > 0:
-            phase_change = prev_hp > 50 and hp <= 50.5
-            logger.debug(f"steps left: {len(routine)} phase_change: {phase_change}")
-            time.sleep(1.4) if phase_change else None
-            if len(routine) == 1:
-                time.sleep(
-                    4.0 if dir == Direction.NE else 2.0
-                )  # wait long animation before 4 move
-            prev_hp = hp
-            hp = routine.pop()()
-
-        if 5 < hp < 13 and dir == Direction.SW:
-            save_image(
-                self._get_frame(),
-                f"fails/dain/multi_shot_{time.strftime('%H-%M-%S')}.png",
+            method = routine.pop()
+            result = method()
+            hp = hp if result is None else result
+            logger.debug(
+                f"steps left: {len(routine)} hp: {hp}% after: {method.__name__}"
             )
-            logger.info(f"Finishing with multi shot... {hp}% left")
-            time.sleep(1)
-            hp = self.controller.skill_4()
-            time.sleep(1)
-            hp = measure_fill_px(extract_boss_health(self._get_frame()), self.debug)
-            logger.info(f"Finished with multi shot... {hp}% left")
 
-        if 0 < hp <= 4:
-            logger.info(f"Finishing with basic attack... {hp}% left")
-            time.sleep(1)
-            self.controller.attack()
-            time.sleep(1)
-            hp = measure_fill_px(extract_boss_health(self._get_frame()), self.debug)
-            logger.info(f"Finished with basic attack... {hp}% left")
-
-        logger.debug("Finished boss Dain...")
+        logger.debug(f"Finished boss Volcano... hp: {hp}%")
         return hp
 
     def open_chest(self, dir: Direction) -> bool:
-        if dir == Direction.NE:
-            self.controller.move_NE()
-            time.sleep(0.2)
+        boss_chest = cv2.imread("resources/boss_chest.png", cv2.IMREAD_COLOR)
+        # start_time = time.time()
+        # box = None
+        # while box is None and time.time() - start_time < 10:
+        #     box, _ = find_tpl(self._get_frame(), boss_chest, score_threshold=0.69)
 
-        self.controller.skill_4((590, 390) if dir == Direction.SW else None)
-        t0 = time.time()
-        time.sleep(1.6)
-        chest = f"resources/dain/{Direction.SW.label.lower()}_chest.png"
-        if wait_for(chest, self._get_frame, 1, 0.68, self.debug):
-            logger.info("wait_for chest again?")
-            self.controller.attack()
-            time.sleep(3)
+        # if box is None:
+        #     raise Exception("Chest not found")
 
-        if wait_for(chest, self._get_frame, 0.1, 0.68, self.debug):
-            logger.info("wait_for chest again? False")
-            return False
+        # self.controller.attack((box["cx"], box["cy"]))
+        self.controller.move_SE()
+        time.sleep(0.3)
+        self.controller.move_NW()
+        time.sleep(0.2)
+        self.controller.attack((650, 290) if dir == Direction.SW else (610, 330))
+        self.controller.attack((650, 290) if dir == Direction.SW else (610, 330))
 
-        logger.debug(f"Chest opened in {time.time() - t0:.1f}s")
-        self.controller.move_S() if dir == Direction.SW else self.controller.move_E()
-        time.sleep(0.1)
-        self.controller.move_SW() if dir == Direction.SW else self.controller.move_NE()
-        time.sleep(0.5)
+        time.sleep(2.3)
+        self.controller.move_SE()
+        time.sleep(0.2)
+        self.controller.move_NW()
+        time.sleep(0.2)
+        self.controller.move_SE()
+        time.sleep(0.2)
+
+        box, _ = find_tpl(self._get_frame(), boss_chest, score_threshold=0.72)
+        if box is not None:
+            raise Exception("Chest still present")
+        cv2.imwrite(
+            f"images/dbg_volcano_chest{time.strftime('%H-%M-%S')}.png", self._get_frame()
+        )
         return True
 
     def portal(self) -> None:

@@ -12,6 +12,7 @@ from model import Direction
 from sensor import MinimapSensor
 
 logger = logging.getLogger(__name__)
+mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
 
 
 class BossMine(Boss):
@@ -61,29 +62,6 @@ class BossMine(Boss):
         self.controller.move_E()
 
     def count_enemies(self, frame830x690: cv2.typing.MatLike) -> int:
-        return 0
-        px, py = 830 // 2, 690 // 2
-        box, score = find_tpl(
-            frame830x690, self.enemy1, [1.0], score_threshold=0.8, debug=self.debug
-        )
-        if box is not None:
-            dist = hypot(box["cx"] - px, box["cy"] - py)
-            return 1 if dist < 180 else 0
-
-        box, score = find_tpl(
-            frame830x690, self.enemy1_ne, [1.0], score_threshold=0.8, debug=self.debug
-        )
-        if box is not None:
-            dist = hypot(box["cx"] - px, box["cy"] - py)
-            return 1 if dist < 180 else 0
-
-        box, score = find_tpl(
-            frame830x690, self.enemy2, [1.0], score_threshold=0.8, debug=self.debug
-        )
-        if box is not None:
-            dist = hypot(box["cx"] - px, box["cy"] - py)
-            return 1 if dist < 180 else 0
-
         return 0
 
     def start_fight(self, dir: Direction) -> int:
@@ -198,7 +176,7 @@ class BossMine(Boss):
         else:
             raise "inventory problem 2"
 
-        if not wait_for("resources/mine.png", self._get_frame, 5, 0.34):
+        if not wait_for(mine, self._get_frame, 5, 0.30):
             print("mine not active")
 
         return True
@@ -210,8 +188,7 @@ class BossMine(Boss):
         print(f"map x={x}, y={y}")
 
     def portal(self) -> None:
-        mine = cv2.imread("resources/mine.png", cv2.IMREAD_COLOR)
-        mine_box, _ = find_tpl(self._get_frame(), mine, score_threshold=0.335)
+        mine_box, _ = find_tpl(self._get_frame(), mine, score_threshold=0.30)
 
         if mine_box is None:
             raise "mine_box problem"
@@ -223,11 +200,10 @@ class BossMine(Boss):
             raise "mine_box click problem"
 
         self.controller.confirm()
-        self.controller.wait_loading(1)
+        self.controller.wait_loading(2, 10)
         if not wait_for("resources/move_mine.png", self._get_frame):
             raise "Mine enter problem"
-        self.controller.wait_loading(0.5)
-        time.sleep(0.5)
+        self.controller.wait_loading(1)
         self.controller.back()
         time.sleep(0.1)
 

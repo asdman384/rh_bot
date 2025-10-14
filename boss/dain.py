@@ -78,7 +78,7 @@ class BossDain(Boss):
             None,
             self.minimap_masks,
             {"ne": 50, "nw": 50, "se": 35, "sw": 30},
-            debug=self.debug or True,
+            debug=self.debug,
         )
         self.ensure_movement = True
         self.controller.move_E()

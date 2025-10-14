@@ -32,6 +32,15 @@
                 "true"
             ],
             "problemMatcher": []
+        },
+        {
+            "label": "Test",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/test.py",
+            ],
+            "problemMatcher": []
         }
     ],
     "inputs": [

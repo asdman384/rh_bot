@@ -187,3 +187,13 @@ def click_in_window(hwnd, x, y, button="left", double=False, route_to_child=True
     else:
         win32gui.SendMessage(target, DOWN, MK, lp)
         win32gui.SendMessage(target, UP, 0, lp)
+
+
+if __name__ == "__main__":
+    import cv2
+
+    hwnd = find_window_by_title("Rogue Hearts")
+    frame = screenshot_window_np(hwnd, client_only=False)
+    print(f"Frame shape: {frame.shape}")
+
+    cv2.imwrite("screenshot.png", frame)

@@ -16,6 +16,7 @@ from boss import (
     BossTroll,
     BossVolcano,
     BossShaman,
+    Boss,
 )
 from bot_utils.logger_memory import LastLogsHandler
 from bot_utils.screenshoter import save_image
@@ -56,6 +57,7 @@ class BotRunner:
         "mine": BossMine,
     }
     last_logs_handler: LastLogsHandler
+    boss: Boss
 
     def __init__(self, boss_type: str, debug=False):
         if isinstance(boss_type, str) and boss_type.lower() in self._boss_map:
@@ -91,6 +93,7 @@ class BotRunner:
             logging.getLogger("maze_rh").setLevel(logging.DEBUG)
             logging.getLogger("boss.dain").setLevel(logging.DEBUG)
             logging.getLogger("boss.krokust").setLevel(logging.DEBUG)
+            logging.getLogger("boss.volcano").setLevel(logging.DEBUG)
             logging.getLogger("boss.boss").setLevel(logging.DEBUG)
 
     def go(self, wait_failed_combat=False):
@@ -283,8 +286,8 @@ if __name__ == "__main__":
         debug = False
     else:
         # krokust | dain | bhalor | khanel | delingh | elvira | mine | troll | volcano | shaman
-        boss_arg = "shaman"
-        debug = True
+        boss_arg = "dain"
+        debug = False
         wait_failed_combat = True
 
     BotRunner(boss_arg, debug).go(wait_failed_combat)
